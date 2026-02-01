@@ -3,6 +3,9 @@ NeuroKnots (뉴로넛)
 
 현대인의 뇌는 숏폼과 즉각적인 자극에 중독되어 집중력과 문해력이 저하된 '팝콘 브레인' 상태에 놓여 있습니다. NeuroKnots는 단순히 스마트폰을 끄는 수동적 차단을 넘어, 전두엽을 다시 사용하는 '능동적 재활' 솔루션을 제공합니다.
 
+Tech Stack
+<p align="center"> <!-- Next.js --> <img src="https://seeklogo.com/images/N/next-js-logo-59C3C0D52F-seeklogo.com.png" alt="Next.js" width="40" /> <!-- React --> <img src="https://seeklogo.com/images/R/react-logo-7B3CE81517-seeklogo.com.png" alt="React" width="40" /> <!-- Tailwind CSS --> <img src="https://logowik.com/content/uploads/images/tailwind-css3232.logowik.com.webp" alt="Tailwind CSS" width="40" /> <!-- Framer Motion --> <img src="https://avatars.githubusercontent.com/u/6472010?s=200&v=4" alt="Framer Motion" width="40" /> <!-- Lucide --> <img src="https://lucide.dev/favicon.svg" alt="Lucide" width="40" /> </p>
+
 ![카테고리1-1](https://github.com/user-attachments/assets/ff49103d-a6a1-4758-bdfb-43427894a4a2)
 ![카테고리1-2](https://github.com/user-attachments/assets/9b13ac4e-126d-464a-ba24-c090c0dfbb19)
 ![카테고리2-1](https://github.com/user-attachments/assets/c402b4af-a220-4f9e-b31a-55aa7b21377b)
@@ -36,13 +39,3 @@ NeuroKnots (뉴로넛)
 ![학습후](https://github.com/user-attachments/assets/3e53af40-fa9a-48d0-9fd9-5e14bd3f0f62)
 ![프로필](https://github.com/user-attachments/assets/d6b2b826-c440-4354-949a-1b83bc65ee38)
 ![리그](https://github.com/user-attachments/assets/94904fe9-80e6-4dd1-a6c4-add1fff67e8e)
-
-Tech Stack
-
-Framework: Next.js, React
-
-Styling: Tailwind CSS
-
-Animation: Framer Motion (부드러운 인지 전환 효과 구현)
-
-Icons: Lucide-React
