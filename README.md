@@ -18,7 +18,11 @@ NeuroKnots (뉴로넛)
 ![리그](https://github.com/user-attachments/assets/94904fe9-80e6-4dd1-a6c4-add1fff67e8e)
 
 Tech Stack
+
 Framework: Next.js, React
+
 Styling: Tailwind CSS
+
 Animation: Framer Motion (부드러운 인지 전환 효과 구현)
+
 Icons: Lucide-React
