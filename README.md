@@ -67,3 +67,6 @@
 ![학습후](https://github.com/user-attachments/assets/3e53af40-fa9a-48d0-9fd9-5e14bd3f0f62)
 ![프로필](https://github.com/user-attachments/assets/d6b2b826-c440-4354-949a-1b83bc65ee38)
 ![리그](https://github.com/user-attachments/assets/94904fe9-80e6-4dd1-a6c4-add1fff67e8e)
+
+### 예상 ERD
+<img width="300" alt="ERD" src="https://github.com/user-attachments/assets/f5c1e3a7-f11f-43f7-a9f3-9e0af4a95b14" />
