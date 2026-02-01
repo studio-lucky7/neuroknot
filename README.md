@@ -41,7 +41,7 @@
 ![학습전](https://github.com/user-attachments/assets/50dda443-338a-40df-a14e-238c0fcc031e)
 ![읽기](https://github.com/user-attachments/assets/08e7fae0-e084-46eb-b1b9-899155492d49)
 
-# NeuroKnot AI 로직 안내
+## NeuroKnot AI 로직 안내
 이 프로젝트에는 **AI 로직 2개**가 사용됩니다.  
 
 ## (1) 문제 추천 / 난이도 조정
