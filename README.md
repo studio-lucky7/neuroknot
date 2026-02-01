@@ -38,7 +38,7 @@
 ![카테고리1-2](https://github.com/user-attachments/assets/9b13ac4e-126d-464a-ba24-c090c0dfbb19)
 ![카테고리2-1](https://github.com/user-attachments/assets/c402b4af-a220-4f9e-b31a-55aa7b21377b)
 ![카테고리2-2](https://github.com/user-attachments/assets/aa84eb61-5904-44ae-96a5-0e664061cfd6)
-![학습전](https://github.com/user-attachments/assets/50dda443-338a-40df-a14e-238c0fcc031e)
+![학습전](https://github.com/user-attachments/assets/3f202918-83dd-4f62-ad8a-86ed4f1d54a8)
 ![읽기](https://github.com/user-attachments/assets/08e7fae0-e084-46eb-b1b9-899155492d49)
 
 ## NeuroKnot AI 로직 안내
@@ -64,7 +64,7 @@
 ### * 주의 사항
 - AI 로직은 **참고용**이며, 실제 구현은 아직 완전히 완료되지 않았습니다.  
 - 모델 버전 및 학습 데이터 출처는 추후 명시 예정입니다.
-![학습후](https://github.com/user-attachments/assets/3e53af40-fa9a-48d0-9fd9-5e14bd3f0f62)
+![학습후](https://github.com/user-attachments/assets/9e9ddc3d-3bee-49de-9a95-dc3b25f9d4b4)
 ![프로필](https://github.com/user-attachments/assets/d6b2b826-c440-4354-949a-1b83bc65ee38)
 ![리그](https://github.com/user-attachments/assets/94904fe9-80e6-4dd1-a6c4-add1fff67e8e)
 
