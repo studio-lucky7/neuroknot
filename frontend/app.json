@@ -9,9 +9,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.hansolham.mobile"
+      "bundleIdentifier": "com.studiolucky7.neuroknot"
     },
     "android": {
+      "package": "com.studiolucky7.neuroknot",
       "adaptiveIcon": {
         "backgroundColor": "#FFF9F0",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
