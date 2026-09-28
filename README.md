@@ -1,3 +1,5 @@
+> 협업 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md) 참고
+
 ## NeuroKnots (뉴로넛)
 "읽는 것만으로 단단해지는 뇌" > AI 맞춤형 읽기 훈련 기반 뇌 건강 회복 플랫폼
 
