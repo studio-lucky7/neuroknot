@@ -59,3 +59,38 @@ class UserMeanBaseline:
         p = (correct + self.smoothing * self._global.predict(user_id, "")) / (n + self.smoothing)
         p = min(max(p, 1e-6), 1 - 1e-6)
         return math.log(p / (1 - p))
+
+
+class OracleModel:
+    """시뮬레이터의 진짜 확률 P = sigmoid(θ_skill - b)로 예측하는 상한선.
+
+    진짜 θ와 b를 알고 있으므로 어떤 모델도 기대값 기준으로 이보다 나을 수 없다.
+    학습 효과도 시뮬레이터와 똑같이 따라간다 (풀 때마다 그 스킬 θ += learning_rate).
+    """
+
+    def __init__(self, user_skills, items, learning_rate: float = 0.0) -> None:
+        self.learning_rate = learning_rate
+        self._theta = {
+            (u, s): float(t)
+            for u, s, t in zip(user_skills["user_id"], user_skills["skill"], user_skills["theta_initial"])
+        }
+        self._item = {i: (s, float(b)) for i, s, b in zip(items["item_id"], items["skill"], items["b"])}
+
+    @classmethod
+    def from_simulation(cls, sim) -> "OracleModel":
+        return cls(sim.user_skills, sim.items, sim.config.learning_rate)
+
+    def predict(self, user_id: str, item_id: str) -> float:
+        skill, b = self._item[item_id]
+        return 1.0 / (1.0 + math.exp(-(self._theta[(user_id, skill)] - b)))
+
+    def update(self, user_id: str, item_id: str, is_correct: bool) -> float:
+        p = self.predict(user_id, item_id)
+        self._theta[(user_id, self._item[item_id][0])] += self.learning_rate
+        return p
+
+    def estimate_theta(self, user_id: str, skill: str | None = None) -> float:
+        if skill is not None:
+            return self._theta[(user_id, skill)]
+        values = [t for (u, _), t in self._theta.items() if u == user_id]
+        return sum(values) / len(values)
