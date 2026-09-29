@@ -6,10 +6,25 @@
 예측 모델이 유저 실력을 제대로 추정하는지 검증한다.
 
 1. IRT(1PL) 시뮬레이터로 유저·문제·풀이 기록을 만든다. 유저의 진짜 θ와 문제의 진짜 난이도 b를 알고 있다.
-2. 모델(Elo, baseline)에 풀이 기록을 시간 순서대로 넣는다. 매 풀이마다 **예측 먼저 → 결과 보고 갱신**.
+2. 모델(Elo, baseline, oracle)에 풀이 기록을 시간 순서대로 넣는다. 매 풀이마다 **예측 먼저 → 결과 보고 갱신**.
 3. 두 가지를 본다.
    - 예측력: AUC, log loss, Brier score (전체 / 유저별 첫 10문제 콜드스타트 구간)
    - θ 복원력: 진짜 θ와 모델 추정치의 Spearman 상관
+
+`oracle`은 시뮬레이터의 진짜 확률 P = sigmoid(θ - b)로 예측하는 상한선이다. 어떤 모델도 이 값을
+기대값 기준으로 넘을 수 없으므로, 다른 모델의 지표는 oracle 대비 어디쯤인지로 읽는다.
+
+### 문제 배정 방식 (`SimulationConfig.selection`)
+
+- `random`: 유저마다 안 푼 문제를 무작위 순서로 푼다.
+- `adaptive`: 매 풀이마다 그 시점 Elo 추정치로 예상 정답률이 `target_p`(0.7)에 가장 가까운 문제를 고른다.
+  실서비스의 적응형 추천을 흉내 낸 것으로, 배정 → 풀이 → Elo 갱신이 모든 유저에 걸쳐 시각 순으로 번갈아 일어난다.
+
+같은 seed면 두 모드의 유저/문제/풀이 시각/정답 노이즈가 같고 배정만 다르다.
+
+**adaptive 결과를 읽을 때 주의**: 문제를 골라 준 Elo와 평가하는 Elo가 같은 모델이라, 평가 대상 Elo의 예측이
+거의 항상 0.7 근처에 모인다. 그래서 AUC는 구조적으로 낮게 나오며 (oracle의 AUC 상한도 함께 낮아진다)
+모델 비교는 log loss/Brier와 θ 복원력 위주로 보는 게 맞다.
 
 나중에 FastAPI 백엔드에서 import해서 쓸 수 있도록 웹 프레임워크/DB 의존 없이 순수 함수·클래스로만 작성했다.
 
@@ -19,9 +34,9 @@
 ml/
 ├── neuroknot_ml/
 │   ├── skills.py     # 스킬 목록 (fact, inference, vocab, main_idea) — Day 0 확정 전 임시값
-│   ├── simulate.py   # IRT(1PL) 시뮬레이터 → users / user_skills / items / attempts DataFrame
+│   ├── simulate.py   # IRT(1PL) 시뮬레이터 (random / adaptive 배정) → users / user_skills / items / attempts
 │   ├── elo.py        # 유저-스킬별 Elo + 문제 난이도 동시 갱신, 풀이 수에 따라 줄어드는 K
-│   ├── baselines.py  # 전체 평균 정답률, 유저별 누적 정답률
+│   ├── baselines.py  # 전체 평균 정답률, 유저별 누적 정답률, oracle(진짜 확률) 상한선
 │   └── evaluate.py   # 온라인 평가(run_online), 지표(score), θ 복원력(theta_recovery)
 ├── scripts/run_experiment.py
 └── tests/
@@ -55,7 +70,7 @@ python -m venv .venv
 pip install -r requirements.txt
 
 pytest                                    # 테스트
-python scripts/run_experiment.py          # 유저 200명, 문제 300개로 모델 비교
+python scripts/run_experiment.py          # 유저 200명, 문제 300개로 random/adaptive 두 조건 모델 비교
 python scripts/run_experiment.py --seed 7 --learning-rate 0   # 시드 변경, 학습 효과 끄기
 ```
 
