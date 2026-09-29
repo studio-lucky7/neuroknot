@@ -9,15 +9,25 @@
 - 온보딩 레벨: 자가평가라서 θ에 노이즈를 더한 값을 4단계로 자른다
 - 문제: 스킬 태그 1개, 난이도 b ~ N(0, item_sd), b를 별 1~5개로 매핑
 - 정답 확률: P = sigmoid(θ_skill - b)
+- 문제 배정(selection)
+  - random: 유저마다 안 푼 문제를 무작위 순서로 푼다
+  - adaptive: 매 풀이마다 그 시점 Elo 추정치로 예상 정답률이 target_p(0.7)에 가장 가까운
+    안 푼 문제를 고른다 (실서비스의 적응형 추천 흉내). 풀이 결과로 Elo를 갱신하고 다음 배정에 쓴다.
+
+모든 유저의 풀이를 timestamp 순서로 하나씩 진행하므로, adaptive에서 배정용 Elo는
+다른 유저의 풀이로 갱신된 문제 난이도까지 반영한다. 두 모드는 같은 난수 흐름을 쓰므로
+같은 seed면 유저/문제/풀이 시각/정답 노이즈가 같고 배정만 다르다.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 import pandas as pd
 
+from .elo import EloModel
 from .skills import SKILLS
 
 ONBOARDING_LEVELS: tuple[str, ...] = ("warming_up", "cruising", "high_speed", "autonomous")
@@ -55,6 +65,8 @@ class SimulationConfig:
     learning_rate: float = 0.01  # 풀이 1회당 해당 스킬 θ 상승량. 0이면 학습 효과 없음
     seed: int = 42
     start: str = "2026-01-01"
+    selection: Literal["random", "adaptive"] = "random"  # 문제 배정 방식
+    target_p: float = 0.7  # adaptive에서 맞추려는 예상 정답률
 
 
 @dataclass
@@ -71,6 +83,8 @@ def simulate(config: SimulationConfig | None = None) -> SimulationResult:
     cfg = config or SimulationConfig()
     if cfg.min_attempts > cfg.max_attempts:
         raise ValueError("min_attempts must be <= max_attempts")
+    if cfg.selection not in ("random", "adaptive"):
+        raise ValueError(f"unknown selection: {cfg.selection!r}")
     rng = np.random.default_rng(cfg.seed)
     n_skills = len(SKILLS)
 
@@ -86,47 +100,77 @@ def simulate(config: SimulationConfig | None = None) -> SimulationResult:
     item_skill = rng.integers(0, n_skills, cfg.n_items)
     b = rng.normal(0.0, cfg.item_sd, cfg.n_items)
     stars = difficulty_to_stars(b)
-
-    # 풀이 기록
-    start = pd.Timestamp(cfg.start)
-    skill_theta_final = skill_theta0.copy()
-    cols: dict[str, list] = {k: [] for k in ("user_id", "item_id", "skill", "difficulty", "is_correct", "timestamp")}
-    for u in range(cfg.n_users):
-        n = min(int(rng.integers(cfg.min_attempts, cfg.max_attempts + 1)), cfg.n_items)
-        order = rng.choice(cfg.n_items, size=n, replace=False)
-        # 문제 사이 간격은 평균 90초, 10% 확률로 0.5~2일 쉬었다가 다음 세션을 시작한다
-        gaps = rng.exponential(90.0, n)
-        gaps += (rng.random(n) < 0.1) * rng.uniform(0.5, 2.0, n) * 86400.0
-        offsets = rng.uniform(0.0, 14.0) * 86400.0 + np.cumsum(gaps)
-        cur = skill_theta0[u].copy()
-        for i, offset in zip(order, offsets):
-            s = item_skill[i]
-            correct = rng.random() < sigmoid(cur[s] - b[i])
-            cols["user_id"].append(user_ids[u])
-            cols["item_id"].append(item_ids[i])
-            cols["skill"].append(SKILLS[s])
-            cols["difficulty"].append(int(stars[i]))
-            cols["is_correct"].append(bool(correct))
-            cols["timestamp"].append(start + pd.Timedelta(seconds=float(offset)))
-            cur[s] += cfg.learning_rate
-        skill_theta_final[u] = cur
-
-    attempts = pd.DataFrame(cols).sort_values("timestamp", kind="stable").reset_index(drop=True)
     users = pd.DataFrame({"user_id": user_ids, "onboarding_level": levels, "theta": theta})
-    user_skills = pd.DataFrame(
-        {
-            "user_id": np.repeat(user_ids, n_skills),
-            "skill": np.tile(np.asarray(SKILLS, dtype=object), cfg.n_users),
-            "theta_initial": skill_theta0.ravel(),
-            "theta_final": skill_theta_final.ravel(),
-        }
-    )
     items = pd.DataFrame(
         {
             "item_id": item_ids,
             "skill": np.asarray(SKILLS, dtype=object)[item_skill],
             "b": b,
             "difficulty": stars,
+        }
+    )
+
+    # 유저별 풀이 수, 무작위 문제 순서, 풀이 시각, 정답 판정용 난수를 미리 뽑는다.
+    # 무작위 문제 순서는 random에서만 쓰지만, 두 모드의 난수 흐름을 같게 하려고 항상 뽑는다.
+    start = pd.Timestamp(cfg.start)
+    orders, noises, events = [], [], []
+    for u in range(cfg.n_users):
+        n = min(int(rng.integers(cfg.min_attempts, cfg.max_attempts + 1)), cfg.n_items)
+        orders.append(rng.choice(cfg.n_items, size=n, replace=False))
+        # 문제 사이 간격은 평균 90초, 10% 확률로 0.5~2일 쉬었다가 다음 세션을 시작한다
+        gaps = rng.exponential(90.0, n)
+        gaps += (rng.random(n) < 0.1) * rng.uniform(0.5, 2.0, n) * 86400.0
+        offsets = rng.uniform(0.0, 14.0) * 86400.0 + np.cumsum(gaps)
+        noises.append(rng.random(n))
+        events.extend((offset, u, j) for j, offset in enumerate(offsets))
+    events.sort()
+
+    # 배정용 Elo (adaptive에서만 사용). 평가용 EloModel과 같은 기본 설정.
+    selector = None
+    if cfg.selection == "adaptive":
+        selector = EloModel()
+        selector.register_users(users)
+        selector.register_items(items)
+        b_est = np.array([selector.item_difficulty(i) for i in item_ids])
+        answered = np.zeros((cfg.n_users, cfg.n_items), dtype=bool)
+        # 예상 확률이 같은 문제끼리는 유저마다 무작위로 고르도록 후보 순서를 섞어 둔다.
+        # 공용 난수 흐름을 건드리지 않도록 별도 시드를 쓴다.
+        tie_rng = np.random.default_rng([cfg.seed, 1])
+        tie_orders = [tie_rng.permutation(cfg.n_items) for _ in range(cfg.n_users)]
+
+    # 풀이 기록: 모든 유저의 풀이를 시각 순으로 하나씩 진행
+    cur = skill_theta0.copy()
+    cols: dict[str, list] = {k: [] for k in ("user_id", "item_id", "skill", "difficulty", "is_correct", "timestamp")}
+    for offset, u, j in events:
+        if selector is None:
+            i = orders[u][j]
+        else:
+            cand = tie_orders[u][~answered[u, tie_orders[u]]]  # 안 푼 문제 (섞인 순서)
+            theta_est = np.array([selector.user_rating(user_ids[u], sk) for sk in SKILLS])
+            p_est = 1.0 / (1.0 + np.exp(-(theta_est[item_skill[cand]] - b_est[cand])))
+            i = cand[np.argmin(np.abs(p_est - cfg.target_p))]
+        s = item_skill[i]
+        correct = bool(noises[u][j] < sigmoid(cur[u, s] - b[i]))
+        cols["user_id"].append(user_ids[u])
+        cols["item_id"].append(item_ids[i])
+        cols["skill"].append(SKILLS[s])
+        cols["difficulty"].append(int(stars[i]))
+        cols["is_correct"].append(correct)
+        cols["timestamp"].append(start + pd.Timedelta(seconds=float(offset)))
+        cur[u, s] += cfg.learning_rate
+        if selector is not None:
+            selector.update(user_ids[u], item_ids[i], correct)
+            b_est[i] = selector.item_difficulty(item_ids[i])
+            answered[u, i] = True
+    skill_theta_final = cur
+
+    attempts = pd.DataFrame(cols).sort_values("timestamp", kind="stable").reset_index(drop=True)
+    user_skills = pd.DataFrame(
+        {
+            "user_id": np.repeat(user_ids, n_skills),
+            "skill": np.tile(np.asarray(SKILLS, dtype=object), cfg.n_users),
+            "theta_initial": skill_theta0.ravel(),
+            "theta_final": skill_theta_final.ravel(),
         }
     )
     return SimulationResult(cfg, users, user_skills, items, attempts)
