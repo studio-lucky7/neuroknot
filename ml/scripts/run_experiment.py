@@ -14,7 +14,7 @@ from scipy.stats import spearmanr
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from neuroknot_ml.baselines import GlobalMeanBaseline, UserMeanBaseline  # noqa: E402
+from neuroknot_ml.baselines import GlobalMeanBaseline, OracleModel, UserMeanBaseline  # noqa: E402
 from neuroknot_ml.elo import EloModel  # noqa: E402
 from neuroknot_ml.evaluate import run_online, score, theta_recovery  # noqa: E402
 from neuroknot_ml.simulate import SimulationConfig, simulate  # noqa: E402
@@ -44,6 +44,7 @@ def main() -> None:
     elo_no_prior.register_items(sim.items)
 
     models = {
+        "oracle": OracleModel.from_simulation(sim),  # 진짜 확률로 예측하는 상한선
         "global_mean": GlobalMeanBaseline(),
         "user_mean": UserMeanBaseline(),
         "elo_no_prior": elo_no_prior,
