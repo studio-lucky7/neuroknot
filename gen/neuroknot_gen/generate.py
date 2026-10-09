@@ -20,6 +20,7 @@ from google import genai
 from google.genai import types
 
 from .schemas import GeneratedQuiz, Passage, QuizSet
+from .shuffle import shuffle_quiz
 
 DEFAULT_MODEL = "gemini-3.8-flash"
 MAX_OUTPUT_TOKENS = 16000
@@ -126,6 +127,9 @@ def generate_quiz(
         )
     if not isinstance(quiz, QuizSet):  # 혹시 dict로 올 경우 대비
         quiz = QuizSet.model_validate(quiz)
+
+    # 모델은 정답을 앞쪽에 몰아 두는 경향이 있어 코드로 자리를 섞는다
+    quiz = shuffle_quiz(quiz, seed=passage.id)
 
     return GeneratedQuiz(
         passage_id=passage.id,
