@@ -38,7 +38,7 @@ cp .env.example .env      # 그리고 .env 에 GEMINI_API_KEY 값을 채운다
 ./.venv/bin/python scripts/run_generate.py fx-001            # 한 편
 ./.venv/bin/python scripts/run_generate.py --all             # 전체
 ./.venv/bin/python scripts/run_generate.py fx-001 --dry-run  # 호출 없이 프롬프트만 확인
-./.venv/bin/python -m pytest                                 # 검사기 테스트
+./.venv/bin/python -m pytest                                 # 검사기·API 테스트
 ```
 
 `--dry-run`과 `pytest`는 API 키가 없어도 동작한다. 프롬프트를 고친 뒤 **모델에
@@ -55,10 +55,16 @@ gen/
 ├── neuroknot_gen/
 │   ├── skills.py            스킬 4종 + 오답 유형 5종
 │   ├── schemas.py           문항·해설 데이터 형식 (Pydantic)
-│   ├── prompts/quiz_v1.md   출제 지침 — 앞으로 계속 고쳐 나갈 파일
+│   ├── prompts/quiz_v*.md   출제 지침 — 앞으로 계속 고쳐 나갈 파일 (기본 v2)
 │   ├── loader.py            지문 읽기 (나중에 DB 조회로 교체)
 │   ├── generate.py          Gemini 호출 — 모델을 바꾸려면 이 파일만 고친다
-│   └── validate.py          자동 검사
+│   ├── shuffle.py           선택지 순서 섞기 (정답 위치 쏠림 방지)
+│   ├── validate.py          자동 검사
+│   └── api/                 앱이 부르는 API (아래 'API' 절)
+│       ├── models.py        요청·응답 형식 — 정답이 새지 않도록 따로 정의
+│       ├── store.py         문항 읽기·답안 저장 (지금은 파일·메모리, 나중에 DB)
+│       ├── routes.py        엔드포인트 3개
+│       └── main.py          혼자 띄워 보기용 앱
 ├── scripts/
 │   ├── check_setup.py       키·모델·지문 점검
 │   └── run_generate.py      실행 진입점
@@ -98,9 +104,35 @@ gen/
 검사에 걸리면 문제 목록을 프롬프트에 덧붙여 **한 번만** 다시 만들고,
 그래도 걸리면 저장하지 않는다.
 
+## API
+
+앱의 읽기 화면 흐름(읽기 완료 → 정답 확인 → 해설 보기)에 맞춘 엔드포인트 3개.
+
+| 화면 동작 | 요청 | 돌려주는 것 |
+| --- | --- | --- |
+| 읽기 완료 | `GET /gen/passages/{passage_id}/quiz` | 문항 3개 (문제·선택지만, **정답 없음**) |
+| 정답 확인 | `POST /gen/attempts` | 맞았는지, 몇 번째 시도인지 (**정답 번호는 안 줌** — 다시 풀기가 있으므로) |
+| 해설 보기 | `GET /gen/attempts/{attempt_id}/explanation` | 정답 번호, 해설, 근거 문장, 고른 오답에 대한 설명 |
+
+채점은 서버에서만 한다. 답안 기록에는 스킬과 '그 오답이 유도하도록 설계된 오류 유형'이
+같이 남는데, 이건 슬라이스 3이 읽을 데이터라 학습자 응답에는 넣지 않는다.
+
+```bash
+./.venv/bin/uvicorn neuroknot_gen.api.main:app --reload
+```
+
+띄운 뒤 <http://127.0.0.1:8000/docs> 에서 직접 눌러 볼 수 있다. 문항은 `out/`에서
+읽으므로 `run_generate.py`를 먼저 돌려 둬야 한다 (`GEN_QUIZ_DIR`로 폴더를 바꿀 수 있음).
+
+지금은 임시 구현이다.
+- 답안 기록은 **메모리**에만 있어 서버를 끄면 사라진다. DB 스키마([공통])가 정해지면
+  `store.py`만 바꾼다.
+- `user_id`를 요청 본문으로 받는다. 로그인이 붙으면 토큰에서 꺼내도록 바꾼다.
+- 팀 공통 서버가 생기면 `app.include_router(router)`로 붙인다.
+
 ## 아직 하지 않은 것
 
 - 평가 세트 (고정 지문 20편 + 채점표). 프롬프트를 고쳤을 때 좋아졌는지를
   숫자로 확인하려면 필요하다.
-- DB 저장과 API. FastAPI 골격이 생긴 뒤 `loader.py`와 저장 부분만 바꾼다.
+- DB 저장. 팀 공통 서버 골격과 DB 스키마가 정해진 뒤 `loader.py`와 `api/store.py`만 바꾼다.
 - 개인화 해설 (학습자의 과거 오답 이력 반영). v1은 지문만 근거로 한다.
