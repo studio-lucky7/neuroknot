@@ -3,7 +3,7 @@ import { Stack } from 'expo-router';
 import { brand } from '@/constants/brand';
 
 export const unstable_settings = {
-  initialRouteName: 'categories',
+  anchor: 'categories',
 };
 
 export default function OnboardingLayout() {
