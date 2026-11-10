@@ -1,4 +1,7 @@
-# neuroknot_ml — 슬라이스 3 (성장 예측) 실험 패키지
+# neuroknot_ml — Prediction Core V1
+
+Elo 실력·난이도 추정, JSON 상태 저장·복원, 확률 보정 평가, 적응형 지문 선택을 제공한다.
+[Prediction Core V1 설계 및 연동 계약](PREDICTION_CORE_V1.md)에 사용 예와 비교 실험 해석을 정리했다.
 
 ## 목적
 
@@ -7,9 +10,17 @@
 
 1. IRT(1PL) 시뮬레이터로 유저·문제·풀이 기록을 만든다. 유저의 진짜 θ와 문제의 진짜 난이도 b를 알고 있다.
 2. 모델(Elo, baseline, oracle)에 풀이 기록을 시간 순서대로 넣는다. 매 풀이마다 **예측 먼저 → 결과 보고 갱신**.
-3. 두 가지를 본다.
+3. 세 가지를 본다.
    - 예측력: AUC, log loss, Brier score (전체 / 유저별 첫 10문제 콜드스타트 구간)
+   - 보정도(calibration): 예측 확률 70%인 문제를 실제로 70% 맞히는지
+     - ECE (Expected Calibration Error): 예측 확률을 10개 구간으로 나눠, 구간별 |예측 평균 - 실제 정답률|을 개수로 가중 평균. 0에 가까울수록 좋다
+     - 신뢰도 표 (`reliability_table`): 구간별 예측 평균, 실제 정답률, 개수
+     - 전체 평균 편향 (`calibration_in_the_large`): 평균 예측 확률에서 실제 정답률을 뺀 값. 양수면 과대 예측
+     - 신뢰도 그래프: `run_experiment.py`가 `ml/results/reliability_{random,adaptive}.png`로 저장. 표본이 20개 미만인 구간은 그래프에서만 숨긴다
    - θ 복원력: 진짜 θ와 모델 추정치의 Spearman 상관
+
+모두에게 전체 평균을 예측하는 `global_mean`도 ECE는 낮을 수 있다.
+ECE는 log loss, Brier score, θ 복원력과 함께 해석한다. 그래프가 저장되는 `ml/results/`는 Git에서 제외한다.
 
 `oracle`은 시뮬레이터의 진짜 확률 P = sigmoid(θ - b)로 예측하는 상한선이다. 어떤 모델도 이 값을
 기대값 기준으로 넘을 수 없으므로, 다른 모델의 지표는 oracle 대비 어디쯤인지로 읽는다.
@@ -22,11 +33,13 @@
 
 같은 seed면 두 모드의 유저/문제/풀이 시각/정답 노이즈가 같고 배정만 다르다.
 
-**adaptive 결과를 읽을 때 주의**: 문제를 골라 준 Elo와 평가하는 Elo가 같은 모델이라, 평가 대상 Elo의 예측이
-거의 항상 0.7 근처에 모인다. 그래서 AUC는 구조적으로 낮게 나오며 (oracle의 AUC 상한도 함께 낮아진다)
-모델 비교는 log loss/Brier와 θ 복원력 위주로 보는 게 맞다.
+**적응형(adaptive)에서는 AUC 대신 보정도와 θ 복원력을 본다.** 문제를 골라 준 Elo와 평가하는 Elo가
+같은 모델이라, 평가 대상 Elo의 예측이 거의 항상 0.7 근처에 모인다. 그래서 AUC는 구조적으로 낮게 나온다
+(oracle의 AUC 상한도 함께 낮아진다). 적응형 배정에서 중요한 건 "70%라고 보고 고른 문제를 실제로 70% 맞히는가"이므로
+ECE와 신뢰도 표(특히 0.6~0.8 구간)로 보정도를 확인하고, θ 복원력으로 실력 추정이 맞는지를 확인한다.
 
-나중에 FastAPI 백엔드에서 import해서 쓸 수 있도록 웹 프레임워크/DB 의존 없이 순수 함수·클래스로만 작성했다.
+이 Python 패키지와 실험 스크립트는 외부 API나 DB 없이 실행된다. 저장소의 NestJS 백엔드와 연결할 때는
+Prediction 입출력 계약을 기준으로 연동 계층을 구성한다.
 
 ## 구조
 
@@ -36,9 +49,11 @@ ml/
 │   ├── skills.py     # 스킬 목록 (fact, inference, vocab, main_idea) — Day 0 확정 전 임시값
 │   ├── simulate.py   # IRT(1PL) 시뮬레이터 (random / adaptive 배정) → users / user_skills / items / attempts
 │   ├── elo.py        # 유저-스킬별 Elo + 문제 난이도 동시 갱신, 풀이 수에 따라 줄어드는 K
+│   ├── selection.py  # 지문 후보, 콜드스타트, 취약 스킬 및 스킬 커버리지 정책
+│   ├── passage_experiment.py  # 동일한 합성 지문·풀이 일정에서 정책 비교
 │   ├── baselines.py  # 전체 평균 정답률, 유저별 누적 정답률, oracle(진짜 확률) 상한선
 │   └── evaluate.py   # 온라인 평가(run_online), 지표(score), θ 복원력(theta_recovery)
-├── scripts/run_experiment.py
+├── scripts/         # 문항 기준 실험과 지문 정책 비교
 └── tests/
 ```
 
@@ -55,7 +70,12 @@ model.update(user_id, item_id, is_correct)    # 결과 반영 (갱신 전 예측
 ## Generation 연동
 
 Generation은 지문 단위 `difficulty_hint`만 전달하며, Prediction이 문항별 초기 난이도를 정한다.
-문항별 난이도 값이 없으면 `0.0`에서 시작한다. 현재 난이도 prior는 임시값이며 실제 데이터가 쌓이면 보정한다.
+`PassageCandidate.from_generated()`는 생성 결과의 세 스킬을 호출자가 제공한 안정적인 문항 ID와 연결한다.
+`register_passage()`는 신규 문항에 대해 문항별 별점, 지문 `difficulty_hint`, 기본 prior `0.0` 순으로 초기값을 선택한다.
+지문 힌트는 세 문항이 공유할 수 있는 약한 난이도 신호로 사용하며, 검증된 문항 난이도는 실데이터로 추정해야 한다.
+기존 문항을 다시 등록하면 학습된 난이도와 풀이 횟수를 보존한다.
+`select_passage()`는 등록된 Elo 모델과 사용자별 노출·풀이 이력을 읽고, 다음 지문과 점수·선택 이유를 반환한다.
+`EloModel.to_state()`와 `EloModel.from_state()`로 모델을 복원할 수 있다. 노출 이력은 호출자가 따로 관리한다.
 
 ## 임시값 (Day 0에 확정/재추정 필요)
 
@@ -74,9 +94,10 @@ python -m venv .venv
 .venv/Scripts/activate        # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 
-pytest                                    # 테스트
+python -m pytest                          # 테스트
 python scripts/run_experiment.py          # 유저 200명, 문제 300개로 random/adaptive 두 조건 모델 비교
 python scripts/run_experiment.py --seed 7 --learning-rate 0   # 시드 변경, 학습 효과 끄기
+python scripts/run_passage_experiment.py  # 동일한 지문에서 Random/Legacy Adaptive/Prediction Core V1 비교
 ```
 
 Windows 콘솔에서 한글이 깨지면 `PYTHONIOENCODING=utf-8`을 설정한다.

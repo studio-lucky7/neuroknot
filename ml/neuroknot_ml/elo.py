@@ -10,7 +10,8 @@ K는 풀이 수 n이 적을 때 크고 점점 줄어든다 (콜드스타트 때 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from math import isfinite
 
 import numpy as np
 import pandas as pd
@@ -41,6 +42,47 @@ class KSchedule:
 
 DEFAULT_USER_K = KSchedule(k0=0.8, decay=0.1, k_min=0.1)
 DEFAULT_ITEM_K = KSchedule(k0=0.4, decay=0.1, k_min=0.05)
+_STATE_VERSION = 1
+
+
+def _state_object(value: object, path: str, *fields: str) -> dict:
+    if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
+        raise ValueError(f"{path} must be an object with string keys")
+    if fields:
+        expected = set(fields)
+        if value.keys() != expected:
+            missing = sorted(expected - value.keys())
+            extra = sorted(value.keys() - expected)
+            raise ValueError(f"{path} has missing fields {missing} and unexpected fields {extra}")
+    return value
+
+
+def _state_number(value: object, path: str) -> float:
+    if isinstance(value, (int, float, np.integer, np.floating)) and not isinstance(value, bool):
+        try:
+            number = float(value)
+        except OverflowError:
+            pass
+        else:
+            if isfinite(number):
+                return number
+    raise ValueError(f"{path} must be a finite number")
+
+
+def _state_attempts(value: object, path: str) -> int:
+    if type(value) is not int or value < 0:
+        raise ValueError(f"{path} must be a nonnegative integer")
+    _state_number(value, path)
+    return value
+
+
+def _state_schedule(value: object, path: str) -> dict[str, float]:
+    fields = _state_object(value, path, "k0", "decay", "k_min")
+    params = {key: _state_number(number, f"{path}.{key}") for key, number in fields.items()}
+    for key, number in params.items():
+        if number < 0:
+            raise ValueError(f"{path}.{key} must be nonnegative")
+    return params
 
 
 class EloModel:
@@ -108,6 +150,10 @@ class EloModel:
     def item_difficulty(self, item_id: str) -> float:
         return self._item(item_id)[0]
 
+    def item_skill(self, item_id: str) -> str:
+        """등록된 문항의 스킬을 반환한다. 미등록 문항은 KeyError."""
+        return self._item_skill[item_id]
+
     def estimate_theta(self, user_id: str, skill: str | None = None) -> float:
         """지정 스킬의 θ, 등록된 스킬의 평균, 또는 스킬이 없을 때 초기 prior."""
         if skill is not None:
@@ -134,3 +180,85 @@ class EloModel:
         user[1] += 1
         item[1] += 1
         return p
+
+    def to_state(self) -> dict:
+        """설정과 학습 상태를 json.dumps에 전달할 수 있는 독립적인 스냅샷으로 내보낸다."""
+        user_skills: dict[str, dict] = {}
+        for (user_id, skill), (theta, attempts) in self._user_state.items():
+            user_skills.setdefault(user_id, {})[skill] = {
+                "theta": _state_number(theta, f"user_skills.{user_id}.{skill}.theta"),
+                "attempts": attempts,
+            }
+        return {
+            "version": _STATE_VERSION,
+            "config": {
+                "level_prior": {
+                    key: _state_number(value, f"config.level_prior.{key}") for key, value in self.level_prior.items()
+                },
+                "star_prior": {
+                    str(key): _state_number(value, f"config.star_prior.{key}") for key, value in self.star_prior.items()
+                },
+                "user_k": _state_schedule(asdict(self.user_k), "config.user_k"),
+                "item_k": _state_schedule(asdict(self.item_k), "config.item_k"),
+            },
+            "user_prior": {key: _state_number(value, f"user_prior.{key}") for key, value in self._user_prior.items()},
+            "user_skills": user_skills,
+            "items": {
+                item_id: {
+                    "skill": self._item_skill[item_id],
+                    "difficulty": _state_number(difficulty, f"items.{item_id}.difficulty"),
+                    "attempts": attempts,
+                }
+                for item_id, (difficulty, attempts) in self._item_state.items()
+            },
+        }
+
+    @classmethod
+    def from_state(cls, state: object) -> EloModel:
+        """to_state 또는 json.loads의 스냅샷으로 새 모델을 만든다.
+
+        버전, 필드 구조 또는 값이 유효하지 않으면 필드 경로를 포함한 ValueError를 발생시킨다.
+        """
+        data = _state_object(state, "state", "version", "config", "user_prior", "user_skills", "items")
+        if type(data["version"]) is not int or data["version"] != _STATE_VERSION:
+            raise ValueError(f"unsupported state.version; expected integer {_STATE_VERSION}")
+
+        config = _state_object(data["config"], "config", "level_prior", "star_prior", "user_k", "item_k")
+        levels = _state_object(config["level_prior"], "config.level_prior")
+        stars = _state_object(config["star_prior"], "config.star_prior")
+        star_prior = {}
+        for key, value in stars.items():
+            try:
+                star = int(key)
+            except ValueError:
+                raise ValueError("config.star_prior keys must be canonical integer strings") from None
+            if str(star) != key:
+                raise ValueError("config.star_prior keys must be canonical integer strings")
+            star_prior[star] = _state_number(value, f"config.star_prior.{key}")
+        model = cls(
+            level_prior={key: _state_number(value, f"config.level_prior.{key}") for key, value in levels.items()},
+            star_prior=star_prior,
+            user_k=KSchedule(**_state_schedule(config["user_k"], "config.user_k")),
+            item_k=KSchedule(**_state_schedule(config["item_k"], "config.item_k")),
+        )
+        for user_id, prior in _state_object(data["user_prior"], "user_prior").items():
+            model._user_prior[user_id] = _state_number(prior, f"user_prior.{user_id}")
+        for user_id, skills in _state_object(data["user_skills"], "user_skills").items():
+            for skill, record in _state_object(skills, f"user_skills.{user_id}").items():
+                path = f"user_skills.{user_id}.{skill}"
+                fields = _state_object(record, path, "theta", "attempts")
+                model._user_state[user_id, skill] = [
+                    _state_number(fields["theta"], f"{path}.theta"),
+                    _state_attempts(fields["attempts"], f"{path}.attempts"),
+                ]
+        for item_id, record in _state_object(data["items"], "items").items():
+            path = f"items.{item_id}"
+            fields = _state_object(record, path, "skill", "difficulty", "attempts")
+            if not isinstance(fields["skill"], str):
+                raise ValueError(f"{path}.skill must be a string")
+            model._item_skill[item_id] = fields["skill"]
+            model._item_state[item_id] = [
+                _state_number(fields["difficulty"], f"{path}.difficulty"),
+                _state_attempts(fields["attempts"], f"{path}.attempts"),
+            ]
+        return model
