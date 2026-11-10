@@ -1,4 +1,7 @@
-# neuroknot_ml — 슬라이스 3 (성장 예측) 실험 패키지
+# neuroknot_ml — Prediction Core V1
+
+Elo 실력·난이도 추정, JSON 상태 저장·복원, 확률 보정 평가, 적응형 지문 선택을 제공한다.
+[Prediction Core V1 설계 및 연동 계약](PREDICTION_CORE_V1.md)에 사용 예와 비교 실험 해석을 정리했다.
 
 ## 목적
 
@@ -45,9 +48,11 @@ ml/
 │   ├── skills.py     # 스킬 목록 (fact, inference, vocab, main_idea) — Day 0 확정 전 임시값
 │   ├── simulate.py   # IRT(1PL) 시뮬레이터 (random / adaptive 배정) → users / user_skills / items / attempts
 │   ├── elo.py        # 유저-스킬별 Elo + 문제 난이도 동시 갱신, 풀이 수에 따라 줄어드는 K
+│   ├── selection.py  # 지문 후보, 콜드스타트, 취약 스킬 및 스킬 커버리지 정책
+│   ├── passage_experiment.py  # 동일한 합성 지문·풀이 일정에서 정책 비교
 │   ├── baselines.py  # 전체 평균 정답률, 유저별 누적 정답률, oracle(진짜 확률) 상한선
 │   └── evaluate.py   # 온라인 평가(run_online), 지표(score), θ 복원력(theta_recovery)
-├── scripts/run_experiment.py
+├── scripts/         # 문항 기준 실험과 지문 정책 비교
 └── tests/
 ```
 
@@ -65,6 +70,9 @@ model.update(user_id, item_id, is_correct)    # 결과 반영 (갱신 전 예측
 
 Generation은 지문 단위 `difficulty_hint`만 전달하며, Prediction이 문항별 초기 난이도를 정한다.
 문항별 난이도 값이 없으면 `0.0`에서 시작한다. 현재 난이도 prior는 임시값이며 실제 데이터가 쌓이면 보정한다.
+`PassageCandidate.from_generated()`는 생성 결과의 세 스킬을 호출자가 제공한 안정적인 문항 ID와 연결한다.
+`select_passage()`는 등록된 Elo 모델과 사용자별 노출·풀이 이력을 읽고, 다음 지문과 점수·선택 이유를 반환한다.
+`EloModel.to_state()`와 `EloModel.from_state()`로 모델을 복원할 수 있다. 노출 이력은 호출자가 따로 관리한다.
 
 ## 임시값 (Day 0에 확정/재추정 필요)
 
@@ -83,9 +91,10 @@ python -m venv .venv
 .venv/Scripts/activate        # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 
-pytest                                    # 테스트
+python -m pytest                          # 테스트
 python scripts/run_experiment.py          # 유저 200명, 문제 300개로 random/adaptive 두 조건 모델 비교
 python scripts/run_experiment.py --seed 7 --learning-rate 0   # 시드 변경, 학습 효과 끄기
+python scripts/run_passage_experiment.py  # 동일한 지문에서 Random/Legacy Adaptive/Prediction Core V1 비교
 ```
 
 Windows 콘솔에서 한글이 깨지면 `PYTHONIOENCODING=utf-8`을 설정한다.
