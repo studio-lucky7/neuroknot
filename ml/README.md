@@ -52,6 +52,11 @@ model.update(user_id, item_id, is_correct)    # 결과 반영 (갱신 전 예측
 `EloModel`은 문제의 스킬을 알아야 하므로 먼저 `register_item(item_id, skill, difficulty)`로 등록하고,
 유저는 `register_user(user_id, onboarding_level)`로 등록하면 온보딩 레벨 prior에서 시작한다.
 
+## Generation 연동
+
+Generation은 지문 단위 `difficulty_hint`만 전달하며, Prediction이 문항별 초기 난이도를 정한다.
+문항별 난이도 값이 없으면 `0.0`에서 시작한다. 현재 난이도 prior는 임시값이며 실제 데이터가 쌓이면 보정한다.
+
 ## 임시값 (Day 0에 확정/재추정 필요)
 
 | 항목 | 위치 | 값 |

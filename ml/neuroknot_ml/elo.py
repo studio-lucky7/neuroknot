@@ -23,7 +23,7 @@ DEFAULT_LEVEL_PRIOR: dict[str, float] = {
     "autonomous": 1.0,
 }
 
-# 문제 생성 파트가 매긴 별 개수별 초기 난이도 prior. TODO(Day 0): 임시값.
+# Prediction에서 사용하는 별 개수별 초기 난이도 prior. TODO(Day 0): 실데이터로 재추정한다.
 DEFAULT_STAR_PRIOR: dict[int, float] = {1: -1.6, 2: -0.8, 3: 0.0, 4: 0.8, 5: 1.6}
 
 
@@ -85,7 +85,7 @@ class EloModel:
         """item_id, skill, (선택) difficulty 컬럼을 가진 DataFrame으로 한꺼번에 등록한다."""
         stars = items["difficulty"] if "difficulty" in items else [None] * len(items)
         for item_id, skill, star in zip(items["item_id"], items["skill"], stars):
-            self.register_item(item_id, skill, None if star is None else int(star))
+            self.register_item(item_id, skill, None if pd.isna(star) else int(star))
 
     # 상태 조회
     def _item(self, item_id: str) -> list:
@@ -109,10 +109,12 @@ class EloModel:
         return self._item(item_id)[0]
 
     def estimate_theta(self, user_id: str, skill: str | None = None) -> float:
-        """스킬을 주면 그 스킬의 θ 추정치, 없으면 스킬 평균."""
+        """지정 스킬의 θ, 등록된 스킬의 평균, 또는 스킬이 없을 때 초기 prior."""
         if skill is not None:
             return self.user_rating(user_id, skill)
         skills = sorted(set(self._item_skill.values()))
+        if not skills:
+            return self._user_prior.get(user_id, 0.0)
         return float(np.mean([self.user_rating(user_id, s) for s in skills]))
 
     # 예측/갱신
