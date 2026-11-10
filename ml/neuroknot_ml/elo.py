@@ -150,6 +150,10 @@ class EloModel:
     def item_difficulty(self, item_id: str) -> float:
         return self._item(item_id)[0]
 
+    def item_skill(self, item_id: str) -> str:
+        """등록된 문항의 스킬을 반환한다. 미등록 문항은 KeyError."""
+        return self._item_skill[item_id]
+
     def estimate_theta(self, user_id: str, skill: str | None = None) -> float:
         """지정 스킬의 θ, 등록된 스킬의 평균, 또는 스킬이 없을 때 초기 prior."""
         if skill is not None:

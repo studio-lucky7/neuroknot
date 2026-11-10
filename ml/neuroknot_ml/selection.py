@@ -8,7 +8,13 @@ from hashlib import sha256
 from math import fsum, isfinite
 from typing import Protocol
 
+from .elo import EloModel
 from .skills import SKILLS
+
+
+def _validate_stars(value: int | None, field: str) -> None:
+    if value is not None and (type(value) is not int or not 1 <= value <= 5):
+        raise ValueError(f"{field} must be an integer from 1 to 5 or None")
 
 
 class SelectionModel(Protocol):
@@ -43,9 +49,7 @@ class PassageCandidate:
             raise ValueError("a passage must contain three PassageQuestion objects")
         if len({q.item_id for q in questions}) != 3 or len({q.skill for q in questions}) != 3:
             raise ValueError("a passage must contain distinct item IDs and skills")
-        hint = self.difficulty_hint
-        if hint is not None and (type(hint) is not int or not 1 <= hint <= 5):
-            raise ValueError("difficulty_hint must be an integer from 1 to 5 or None")
+        _validate_stars(self.difficulty_hint, "difficulty_hint")
         object.__setattr__(self, "questions", questions)
 
     @classmethod
@@ -54,13 +58,47 @@ class PassageCandidate:
         try:
             passage_id = generated["passage_id"]
             quiz = generated["quiz"]
+            if not isinstance(quiz, Mapping):
+                raise TypeError("quiz must be a mapping")
             skills = tuple(question["skill"] for question in quiz["questions"])
-            hint = quiz["difficulty_hint"]
+            hint = quiz.get("difficulty_hint")
         except (KeyError, TypeError) as error:
             raise ValueError("invalid GeneratedQuiz passage_id, quiz or questions") from error
-        if isinstance(item_ids, str) or len(item_ids) != 3 or len(skills) != 3:
+        if (
+            not isinstance(item_ids, Sequence) or isinstance(item_ids, (str, bytes))
+            or len(item_ids) != 3 or len(skills) != 3
+        ):
             raise ValueError("GeneratedQuiz requires exactly three questions and three item IDs")
         return cls(passage_id, tuple(PassageQuestion(i, s) for i, s in zip(item_ids, skills)), hint)
+
+
+def register_passage(
+    model: EloModel,
+    passage: PassageCandidate,
+    *,
+    item_difficulties: Mapping[str, int | None] | None = None,
+) -> None:
+    """신규 문항을 문항별 별점 또는 지문 힌트로 초기화한다."""
+    overrides = {} if item_difficulties is None else item_difficulties
+    item_ids = {question.item_id for question in passage.questions}
+    for item_id, stars in overrides.items():
+        if item_id not in item_ids:
+            raise ValueError(f"difficulty provided for unknown item ID: {item_id!r}")
+        _validate_stars(stars, f"item_difficulties[{item_id!r}]")
+
+    new_questions = []
+    for question in passage.questions:
+        try:
+            skill = model.item_skill(question.item_id)
+        except KeyError:
+            new_questions.append(question)
+        else:
+            if skill != question.skill:
+                raise ValueError(f"item {question.item_id!r} is already registered for skill {skill!r}")
+
+    for question in new_questions:
+        stars = overrides.get(question.item_id)
+        model.register_item(question.item_id, question.skill, passage.difficulty_hint if stars is None else stars)
 
 
 @dataclass(frozen=True)
