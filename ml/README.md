@@ -38,7 +38,8 @@ ECE는 log loss, Brier score, θ 복원력과 함께 해석한다. 그래프가 
 (oracle의 AUC 상한도 함께 낮아진다). 적응형 배정에서 중요한 건 "70%라고 보고 고른 문제를 실제로 70% 맞히는가"이므로
 ECE와 신뢰도 표(특히 0.6~0.8 구간)로 보정도를 확인하고, θ 복원력으로 실력 추정이 맞는지를 확인한다.
 
-나중에 FastAPI 백엔드에서 import해서 쓸 수 있도록 웹 프레임워크/DB 의존 없이 순수 함수·클래스로만 작성했다.
+이 Python 패키지와 실험 스크립트는 외부 API나 DB 없이 실행된다. 저장소의 NestJS 백엔드와 연결할 때는
+Prediction 입출력 계약을 기준으로 연동 계층을 구성한다.
 
 ## 구조
 
@@ -69,8 +70,10 @@ model.update(user_id, item_id, is_correct)    # 결과 반영 (갱신 전 예측
 ## Generation 연동
 
 Generation은 지문 단위 `difficulty_hint`만 전달하며, Prediction이 문항별 초기 난이도를 정한다.
-문항별 난이도 값이 없으면 `0.0`에서 시작한다. 현재 난이도 prior는 임시값이며 실제 데이터가 쌓이면 보정한다.
 `PassageCandidate.from_generated()`는 생성 결과의 세 스킬을 호출자가 제공한 안정적인 문항 ID와 연결한다.
+`register_passage()`는 신규 문항에 대해 문항별 별점, 지문 `difficulty_hint`, 기본 prior `0.0` 순으로 초기값을 선택한다.
+지문 힌트는 세 문항이 공유할 수 있는 약한 난이도 신호로 사용하며, 검증된 문항 난이도는 실데이터로 추정해야 한다.
+기존 문항을 다시 등록하면 학습된 난이도와 풀이 횟수를 보존한다.
 `select_passage()`는 등록된 Elo 모델과 사용자별 노출·풀이 이력을 읽고, 다음 지문과 점수·선택 이유를 반환한다.
 `EloModel.to_state()`와 `EloModel.from_state()`로 모델을 복원할 수 있다. 노출 이력은 호출자가 따로 관리한다.
 

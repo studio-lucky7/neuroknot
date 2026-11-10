@@ -4,9 +4,10 @@
 
 | 입력 | 계약 |
 | --- | --- |
-| Generation 결과 | 검수된 `GeneratedQuiz` JSON의 `passage_id`, `quiz.difficulty_hint`, `quiz.questions[*].skill`을 읽는다. 지문마다 서로 다른 스킬의 문항 3개가 필요하다. |
-| 문항 ID | 호출자가 퀴즈 버전별로 안정적인 문자열 ID 3개를 원래 문항 순서대로 제공한다. 같은 지문의 여러 퀴즈 버전 중 노출 가능한 버전 하나를 선택해서 전달한다. |
-| 모델 | `predict(user_id, item_id)`와 `user_rating(user_id, skill)`을 제공한다. Elo에 문항을 등록할 때 후보와 같은 스킬을 사용한다. 문항별 난이도는 Prediction에서 정하며, 없으면 기존 기본 prior `0.0`을 적용한다. `difficulty_hint`는 지문 메타데이터로 보존한다. |
+| Generation 결과 | 검수된 `GeneratedQuiz` JSON의 `passage_id`, `quiz.difficulty_hint`, `quiz.questions[*].skill`을 읽는다. 지문마다 서로 다른 스킬의 문항 3개가 필요하다. Generation 스키마는 힌트를 요구하며, Prediction 어댑터는 힌트가 없거나 `null`인 입력도 받는다. |
+| 문항 ID | 호출자가 퀴즈 버전별로 고유하고 안정적인 문자열 ID 3개를 원래 문항 순서대로 제공한다. 같은 지문의 여러 퀴즈 버전 중 노출 가능한 버전 하나를 선택해서 전달한다. |
+| 모델 | `predict(user_id, item_id)`와 `user_rating(user_id, skill)`을 제공한다. `register_passage()`로 후보의 문항을 Elo에 등록한 뒤 선택한다. |
+| 문항별 초기 별점 | Prediction이 보유한 값이 있으면 `item_difficulties={item_id: stars}`로 넘긴다. `stars`는 1–5 정수이며, 키 생략 또는 값 `None`은 지문 힌트를 사용한다. |
 | 사용자 이력 | `seen_passage_ids`와 `seen_item_ids`는 사용자에게 이미 노출한 ID 집합이다. `skill_attempts`는 스킬별 누적 첫 응답 수다. 생략한 스킬의 횟수는 0이다. |
 
 `SelectionResult`는 선택한 `passage`, `scores`, `reasons`와 평가 가능·기노출·미등록 후보 수를 담는다.
@@ -17,13 +18,12 @@
 import json
 
 from neuroknot_ml.elo import EloModel
-from neuroknot_ml.selection import PassageCandidate, select_passage
+from neuroknot_ml.selection import PassageCandidate, register_passage, select_passage
 
 model = EloModel()
 model.register_user("u1", "cruising")
 candidate = PassageCandidate.from_generated(generated_quiz, ["q101", "q102", "q103"])
-for question in candidate.questions:
-    model.register_item(question.item_id, question.skill)  # 문항별 prior가 있으면 difficulty 전달
+register_passage(model, candidate, item_difficulties={"q101": 3})
 
 result = select_passage(
     model,
@@ -43,6 +43,18 @@ restored = EloModel.from_state(json.loads(payload))
 
 상태 스키마 버전 1은 모델 설정·K 스케줄, 사용자 온보딩 prior, 사용자·스킬별 θ와 풀이 수,
 문항별 스킬·난이도·풀이 수를 저장한다. 같은 후보군·설정·이력을 넘기면 복원 후에도 같은 지문을 선택한다.
+
+### 신규 문항 난이도 초기화
+
+등록 순서는 **명시한 문항별 별점 → 지문 힌트 → 중립 prior**다. 별점은 모델의 기존 매핑을 사용한다.
+기본 설정에서 1–5는 각각 `-1.6`, `-0.8`, `0.0`, `0.8`, `1.6`이다. 별점과 힌트가 둘 다 없으면 `b=0.0`으로 시작한다.
+같은 ID와 스킬로 다시 등록해도 기존 `b`와 풀이 수를 보존하며, 이 동작은 JSON 복원 뒤에도 같다.
+후보에 없는 ID를 덮어쓰려 하거나, 이미 등록된 ID의 스킬이 후보와 다르거나, 별점 범위가 틀리면 등록 전에 `ValueError`를 반환한다.
+
+힌트는 지문의 체감 난이도이므로 문항별 실측값보다 신뢰도가 낮다. V1은 지문 힌트가 높을수록 해당 지문의
+미등록 문항도 대체로 어려울 수 있다고 가정한다. 같은 지문에서 상속받은 문항은 같은 초기값으로 시작하고, 스킬·선택지 품질에 따른
+문항 간 차이는 풀이가 쌓인 뒤 기존 Elo 갱신으로 분리된다. 별점 매핑의 크기는 실데이터로 보정되지 않았다.
+현재 스냅샷은 유효한 현재 `b`와 풀이 수를 저장하며, 초기값의 출처나 신뢰도 점수는 호출 측에서 관리한다.
 
 ## 선택 정책
 
@@ -67,6 +79,8 @@ restored = EloModel.from_state(json.loads(payload))
 `python scripts/run_experiment.py`는 기존 문항 단위 Random·Adaptive 기준선과 확률 보정 평가를 실행한다.
 `python scripts/run_passage_experiment.py`는 합성 지문 은행, 사용자, 풀이 시점, 응답 난수를 공유하는 별도의 비교다.
 각 정책은 동일한 초기 Elo에서 시작해 자신이 노출한 문항으로 갱신한다.
+두 합성 실험 모두 문항별 별점을 명시하므로 지문 힌트 폴백이 적용되기 전후의 기본 시드 출력은 동일하다.
+폴백이 선택에 미치는 영향은 별점이 없는 동일 스킬 구성의 지문 두 편에 힌트 1과 5를 부여하는 회귀 테스트로 검증한다.
 
 - **Random**은 미노출 지문을 균등 추출한다.
 - **Legacy Adaptive**는 기존 개별 문항 규칙을 지문 단위로 적용한다. 목표 `0.70`에 가장 가까운 개별 문항을 찾고 그 지문의 세 문항을 제공한다.
