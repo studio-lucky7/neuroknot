@@ -2,18 +2,29 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, fields, replace
 from datetime import datetime
+from hashlib import sha256
+from math import isfinite
 from threading import RLock
+from types import MappingProxyType
 
 from .elo import EloModel
 from .learning_events import (
     Completion, Event, EventEnvelope, EventValidationError, Exposure, Submission,
-    parse_envelope, parse_event, require_id,
+    parse_envelope, parse_event, parse_sequence, require_id,
 )
 from .selection import PassageCandidate, SelectionConfig, SelectionResult, register_passage, select_passage
 from .skills import SKILLS
+
+_CHECKPOINT_VERSION = 1
+_MODEL_REVISION = "elo-v1"
+_CHECKPOINT_FIELDS = {
+    "checkpoint_version", "model_revision", "stream_id", "through_sequence", "model",
+    "catalog", "catalog_revision", "onboarding_levels", "onboarding_revision", "journal",
+}
 
 
 class EventConflictError(EventValidationError):
@@ -108,9 +119,10 @@ class LearningHistory:
 
     def __init__(
         self, items: Iterable[CatalogItem], *, onboarding_levels: Mapping[str, str | None] | None = None,
-        quiz_catalog: Iterable[QuizManifest] = (),
+        quiz_catalog: Iterable[QuizManifest] = (), stream_id: str = "learning",
     ) -> None:
         self._lock = RLock()
+        self._stream_id = require_id(stream_id, "stream_id")
         self._model = EloModel()
         self._items: dict[str, CatalogItem] = {}
         for item in items:
@@ -126,7 +138,8 @@ class LearningHistory:
             if len({self._items[item_id].skill for item_id in quiz.item_ids}) != 3:
                 raise EventValidationError("quiz manifest requires three distinct skills")
             self._quizzes[key] = quiz
-        for user_id, level in (onboarding_levels or {}).items():
+        self._onboarding_levels = dict(onboarding_levels or {})
+        for user_id, level in self._onboarding_levels.items():
             require_id(user_id, "onboarding user_id")
             if level is not None:
                 require_id(level, "onboarding level")
@@ -241,7 +254,8 @@ class LearningHistory:
                         raise EventValidationError("candidate skill does not match catalog")
                     if question.item_id not in probabilities:
                         probabilities[question.item_id] = self._model.predict(user_id, question.item_id)
-            view = _SelectionView(probabilities, {skill: self._model.user_rating(user_id, skill) for skill in SKILLS})
+            ratings = {skill: self._model.user_rating(user_id, skill) for skill in SKILLS}
+            view = _SelectionView(MappingProxyType(probabilities), MappingProxyType(ratings))
             seen_passages, seen_items = set(), set()
             counts = dict.fromkeys(SKILLS, 0)
             for record in records:
@@ -425,9 +439,10 @@ class LearningHistory:
         *,
         onboarding_levels: Mapping[str, str | None] | None = None,
         quiz_catalog: Iterable[QuizManifest] = (),
+        stream_id: str = "learning",
     ) -> LearningHistory:
         """발급된 전역 순번으로 재생한다."""
-        history = cls(items, onboarding_levels=onboarding_levels, quiz_catalog=quiz_catalog)
+        history = cls(items, onboarding_levels=onboarding_levels, quiz_catalog=quiz_catalog, stream_id=stream_id)
         history.replay_suffix(envelopes)
         return history
 
@@ -436,6 +451,130 @@ class LearningHistory:
         with self._lock:
             for envelope in parsed:
                 self._apply_envelope(envelope)
+
+    def checkpoint(self) -> dict:
+        """한 커서에서 모델·카탈로그·원본 처리 결과를 JSON 호환 구조로 캡처한다."""
+        with self._lock:
+            self._require_sequenced()
+            catalog = {
+                "items": [asdict(self._items[key]) for key in sorted(self._items)],
+                "quizzes": [
+                    {**asdict(self._quizzes[key]), "item_ids": list(self._quizzes[key].item_ids)}
+                    for key in sorted(self._quizzes)
+                ],
+            }
+            onboarding = dict(self._onboarding_levels)
+            return {
+                "checkpoint_version": _CHECKPOINT_VERSION,
+                "model_revision": _MODEL_REVISION,
+                "stream_id": self._stream_id,
+                "through_sequence": str(len(self._journal)),
+                "model": self._model.to_state(),
+                "catalog": catalog,
+                "catalog_revision": _revision(catalog),
+                "onboarding_levels": onboarding,
+                "onboarding_revision": _revision(onboarding),
+                "journal": [
+                    {"envelope": envelope.to_dict(), "attempt": None if record.attempt is None else asdict(record.attempt)}
+                    for envelope, record in self._journal
+                ],
+            }
+
+    @classmethod
+    def from_checkpoint(cls, payload: Mapping, *, expected_stream_id: str | None = None) -> LearningHistory:
+        """저장된 영수증과 이력을 재구성하고 Elo는 스냅샷에서 복원한다."""
+        if not isinstance(payload, Mapping) or payload.keys() != _CHECKPOINT_FIELDS:
+            raise EventValidationError("invalid checkpoint fields")
+        if type(payload["checkpoint_version"]) is not int or payload["checkpoint_version"] != _CHECKPOINT_VERSION:
+            raise EventValidationError("unsupported checkpoint version")
+        if payload["model_revision"] != _MODEL_REVISION:
+            raise EventValidationError("unsupported checkpoint model revision")
+        if expected_stream_id is not None and payload["stream_id"] != expected_stream_id:
+            raise EventValidationError("checkpoint stream_id does not match")
+        cursor = parse_sequence(payload["through_sequence"], allow_zero=True)
+        rows = payload["journal"]
+        if not isinstance(rows, list) or len(rows) != cursor:
+            raise EventValidationError("checkpoint journal does not match through_sequence")
+        catalog, onboarding = payload["catalog"], payload["onboarding_levels"]
+        if not isinstance(catalog, dict) or catalog.keys() != {"items", "quizzes"} or not isinstance(onboarding, dict):
+            raise EventValidationError("invalid checkpoint catalog or onboarding")
+        if _revision(catalog) != payload["catalog_revision"] or _revision(onboarding) != payload["onboarding_revision"]:
+            raise EventValidationError("checkpoint catalog or onboarding revision does not match")
+        try:
+            items = [CatalogItem(**item) for item in catalog["items"]]
+            quizzes = [
+                QuizManifest(quiz["passage_id"], quiz["quiz_version"], tuple(quiz["item_ids"]))
+                for quiz in catalog["quizzes"]
+            ]
+        except (KeyError, TypeError) as error:
+            raise EventValidationError("invalid checkpoint catalog entry") from error
+        history = cls(items, onboarding_levels=onboarding, quiz_catalog=quizzes, stream_id=payload["stream_id"])
+        for index, row in enumerate(rows, start=1):
+            if not isinstance(row, Mapping) or row.keys() != {"envelope", "attempt"}:
+                raise EventValidationError("invalid checkpoint journal row")
+            envelope = parse_envelope(row["envelope"])
+            if envelope.sequence != index:
+                raise EventValidationError("checkpoint journal sequence is not contiguous")
+            trace = _read_trace(row["attempt"])
+            if isinstance(envelope.event, Submission) != (trace is not None):
+                raise EventValidationError("checkpoint journal attempt does not match event")
+            record = history._apply_envelope(envelope, restored_attempt=trace)
+            if record.attempt != trace:
+                raise EventValidationError("checkpoint alias does not match its original attempt")
+        restored = EloModel.from_state(payload["model"])
+        history._verify_model_boundary(restored)
+        history._model = restored
+        return history
+
+    def _verify_model_boundary(self, restored: EloModel) -> None:
+        # 원본 trace의 전후 값과 갱신 수로 경계를 검증한다. Elo 갱신은 재실행하지 않는다.
+        expected = self._model.to_state()
+        for record in self._processed.values():
+            event, trace = record.event, record.attempt
+            if not isinstance(event, Submission):
+                continue
+            assert trace is not None
+            skills = expected["user_skills"].get(event.user_id, {})
+            skill = skills.get(event.skill, {"theta": expected["user_prior"].get(event.user_id, 0.0), "attempts": 0})
+            item = expected["items"][event.item_id]
+            if (trace.theta_before, trace.difficulty_before) != (skill["theta"], item["difficulty"]):
+                raise EventValidationError("checkpoint trace does not continue the previous model state")
+            if trace.elo_updated:
+                skill = {"theta": trace.theta_after, "attempts": skill["attempts"] + 1}
+                expected["user_skills"].setdefault(event.user_id, {})[event.skill] = skill
+                item.update(difficulty=trace.difficulty_after, attempts=item["attempts"] + 1)
+            elif (trace.theta_after, trace.difficulty_after) != (trace.theta_before, trace.difficulty_before):
+                raise EventValidationError("checkpoint retry cannot change model state")
+        if restored.to_state() != expected:
+            raise EventValidationError("checkpoint model does not match journal boundary")
+
+
+def _revision(payload: dict) -> str:
+    try:
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    except (TypeError, ValueError) as error:
+        raise EventValidationError("checkpoint metadata must be JSON compatible") from error
+    return sha256(encoded).hexdigest()
+
+
+def _read_trace(payload: object) -> AttemptTrace | None:
+    if payload is None:
+        return None
+    if not isinstance(payload, Mapping) or payload.keys() != {field.name for field in fields(AttemptTrace)}:
+        raise EventValidationError("invalid checkpoint attempt fields")
+    for key, value in payload.items():
+        if key == "elo_updated":
+            valid = type(value) is bool
+        else:
+            try:
+                valid = type(value) in (float, int) and isfinite(value)
+            except OverflowError:
+                valid = False
+        if not valid:
+            raise EventValidationError(f"invalid checkpoint attempt {key}")
+    if not 0 <= payload["probability"] <= 1:
+        raise EventValidationError("invalid checkpoint probability")
+    return AttemptTrace(**payload)
 
 
 def _validate_quiz_exposure(event: Exposure, quizzes: Mapping[tuple[str, str], QuizManifest]) -> None:

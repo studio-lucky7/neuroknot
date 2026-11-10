@@ -79,6 +79,8 @@ def test_selection_sees_one_cursor_and_cannot_mutate_elo(monkeypatch):
 
     def apply_while_scoring(view, user_id, candidates, **options):
         assert not hasattr(view, "update") and not hasattr(view, "register_item")
+        with pytest.raises(TypeError):
+            view.probabilities[ids[0]] = 0.0
         history.accept_event(exposure(user_id="u2", item_ids=ids, occurred_at=AT), applied_at=AT)
         history.accept_event(submission(user_id="u2", item_id=ids[0], occurred_at=AT), applied_at=AT)
         return original_select(view, user_id, candidates, **options)
