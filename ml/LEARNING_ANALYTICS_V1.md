@@ -5,6 +5,7 @@
 `EloModel`의 공개 등록·조회·예측·갱신 메서드를 사용한다. `evaluate.run_online()`의 예측 후 갱신 순서를
 서비스 이벤트에 적용한다. `simulate`는 합성 검증에 사용하고 기존 스킬 네 종류를 그대로 사용한다.
 Prediction Core V1의 스냅샷, 보정도, 선택기는 별도 연동 범위다.
+[Prediction Core 통합 준비 설계](LEARNING_ANALYTICS_INTEGRATION.md)에 상태 소유권, 체크포인트와 순번 계약을 정리했다.
 
 Expo 읽기 화면은 임시 정답을 로컬에서 판정하고 완료 표시를 저장한다. 홈은 이 표시로 연속 학습과 주간 상태를,
 프로필은 고정 데이터로 주간 차트를 그린다. Generation 결과는 지문 ID와 프롬프트 버전, 문항 스킬을 제공한다.
