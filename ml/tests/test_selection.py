@@ -9,13 +9,17 @@ def passage(passage_id, skills=("fact", "inference", "vocab")):
 
 
 class FixedModel:
-    def __init__(self, *groups):
+    def __init__(self, *groups, ratings=None):
+        self.ratings = ratings or {}
         self.probabilities = {
             q.item_id: p for candidate, probabilities in groups for q, p in zip(candidate.questions, probabilities)
         }
 
     def predict(self, user_id, item_id):
         return self.probabilities[item_id]
+
+    def user_rating(self, user_id, skill):
+        return self.ratings.get(skill, 0.0)
 
 
 def test_maps_generation_shape_and_external_item_ids():
@@ -35,7 +39,7 @@ def test_maps_generation_shape_and_external_item_ids():
 def test_uses_all_three_probabilities_instead_of_only_their_mean():
     even, uneven = passage("even"), passage("uneven")
     model = FixedModel((even, (0.65, 0.75, 0.7)), (uneven, (0.1, 1.0, 1.0)))
-    result = select_passage(model, "u1", [uneven, even])
+    result = select_passage(model, "u1", [uneven, even], config=SelectionConfig(cold_start_attempts=0))
 
     assert result.passage == even
     assert result.scores.probabilities == (0.65, 0.75, 0.7)
@@ -86,6 +90,15 @@ def test_reports_empty_or_unregistered_catalog():
     assert exhausted.excluded_unregistered == 1
 
 
+def test_never_reuses_seen_items_when_no_other_candidate_exists():
+    only = passage("only")
+    result = select_passage(FixedModel(), "u1", [only], seen_item_ids={only.questions[-1].item_id})
+
+    assert result.passage is None
+    assert result.reasons == ("no_eligible_passage",)
+    assert (result.excluded_seen, result.excluded_unregistered) == (1, 0)
+
+
 def test_ties_are_reproducible_per_user_regardless_of_candidate_order():
     candidates = [passage(str(i)) for i in range(8)]
     model = FixedModel(*((candidate, (0.7, 0.7, 0.7)) for candidate in candidates))
@@ -106,3 +119,75 @@ def test_rejects_invalid_catalog_and_predictions():
         select_passage(FixedModel((first, (0.6, float("nan"), 0.7))), "u1", [first])
     with pytest.raises(ValueError, match="target_p"):
         SelectionConfig(target_p=0)
+
+
+def test_cold_start_prefers_more_accessible_passage_until_threshold():
+    easier, normal = passage("easier"), passage("normal")
+    model = FixedModel((easier, (0.8,) * 3), (normal, (0.7,) * 3))
+    cold = select_passage(model, "u1", [easier, normal], skill_attempts={"fact": 5})
+    warm = select_passage(model, "u1", [easier, normal], skill_attempts={"fact": 6})
+
+    assert (cold.passage, cold.scores.target_p) == (easier, 0.8)
+    assert cold.reasons[0] == "cold_start"
+    assert cold.scores.weakness_bonus == 0.0
+    assert (warm.passage, warm.scores.target_p) == (normal, 0.7)
+
+
+def test_weakness_bonus_uses_observed_skills_after_cold_start():
+    weak, other = passage("weak"), passage("other", ("inference", "vocab", "main_idea"))
+    model = FixedModel(
+        (weak, (0.66,) * 3), (other, (0.7,) * 3),
+        ratings={"fact": -1.0, "inference": 0.6, "vocab": 0.2, "main_idea": -2.0},
+    )
+    result = select_passage(
+        model, "u1", [other, weak], skill_attempts={"fact": 2, "inference": 2, "vocab": 2},
+        config=SelectionConfig(coverage_weight=0.0),
+    )
+
+    assert result.passage == weak
+    assert result.scores.weakness_bonus == pytest.approx(0.2 / 3)
+    assert result.reasons == ("target_fit", "weak_skill")
+
+
+def test_coverage_bonus_favors_underrepresented_skill():
+    common = passage("common")
+    diverse = passage("diverse", ("fact", "vocab", "main_idea"))
+    model = FixedModel((common, (0.7,) * 3), (diverse, (0.67,) * 3))
+    result = select_passage(model, "u1", [common, diverse], skill_attempts={"fact": 5, "inference": 5, "vocab": 5})
+
+    assert result.passage == diverse
+    assert result.scores.coverage_bonus == pytest.approx(0.15 / 3)
+    assert result.reasons == ("target_fit", "skill_coverage")
+
+
+@pytest.mark.parametrize("counts", [{"fact": -1}, {"vocab": True}, {"unknown": 2}, {"fact": 1.5}])
+def test_rejects_invalid_history(counts):
+    with pytest.raises(ValueError, match="invalid skill attempt count"):
+        select_passage(FixedModel(), "u1", [], skill_attempts=counts)
+
+
+def test_same_history_and_restored_model_select_same_passage():
+    first, second = passage("first"), passage("second")
+    model = EloModel()
+    for q in first.questions + second.questions:
+        model.register_item(q.item_id, q.skill, 2)
+    for q in first.questions:
+        model.update("u1", q.item_id, q.skill == "fact")
+    inputs = {
+        "skill_attempts": {q.skill: 1 for q in first.questions},
+        "seen_passage_ids": {first.passage_id},
+    }
+    restored = EloModel.from_state(model.to_state())
+
+    before = select_passage(model, "u1", [first, second], **inputs)
+    after = select_passage(restored, "u1", [second, first], **inputs)
+    assert before == after
+    assert after.passage == second
+
+
+def test_rejects_nonfinite_skill_ratings_used_for_weakness():
+    candidate = passage("p1")
+    model = FixedModel((candidate, (0.7,) * 3), ratings={"fact": float("inf")})
+
+    with pytest.raises(ValueError, match="ratings must be finite"):
+        select_passage(model, "u1", [candidate], skill_attempts={"fact": 3, "vocab": 3})

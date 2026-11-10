@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
-from math import fsum
+from math import fsum, isfinite
 from typing import Protocol
 
 from .skills import SKILLS
@@ -13,6 +13,8 @@ from .skills import SKILLS
 
 class SelectionModel(Protocol):
     def predict(self, user_id: str, item_id: str) -> float: ...
+
+    def user_rating(self, user_id: str, skill: str) -> float: ...
 
 
 @dataclass(frozen=True)
@@ -64,10 +66,23 @@ class PassageCandidate:
 @dataclass(frozen=True)
 class SelectionConfig:
     target_p: float = 0.7
+    cold_start_target_p: float = 0.8
+    cold_start_attempts: int = 6
+    weakness_min_attempts: int = 2
+    weakness_weight: float = 0.2
+    coverage_weight: float = 0.15
 
     def __post_init__(self) -> None:
-        if not 0 < self.target_p < 1:
-            raise ValueError("target_p must be between 0 and 1")
+        for field in ("target_p", "cold_start_target_p"):
+            if not 0 < getattr(self, field) < 1:
+                raise ValueError(f"{field} must be between 0 and 1")
+        for field, minimum in (("cold_start_attempts", 0), ("weakness_min_attempts", 1)):
+            value = getattr(self, field)
+            if type(value) is not int or value < minimum:
+                raise ValueError(f"{field} must be an integer >= {minimum}")
+        for field in ("weakness_weight", "coverage_weight"):
+            if not 0 <= getattr(self, field) <= 1:
+                raise ValueError(f"{field} must be in [0, 1]")
 
 
 @dataclass(frozen=True)
@@ -76,6 +91,8 @@ class PassageScores:
     mean_probability: float
     target_p: float
     target_distance: float
+    weakness_bonus: float
+    coverage_bonus: float
     total_score: float
 
 
@@ -89,6 +106,19 @@ class SelectionResult:
     excluded_unregistered: int
 
 
+def _weakest_skills(model: SelectionModel, user_id: str, counts: Mapping[str, int], minimum: int) -> set[str]:
+    supported = [skill for skill in SKILLS if counts[skill] >= minimum]
+    if len(supported) < 2:
+        return set()
+    ratings = {skill: model.user_rating(user_id, skill) for skill in supported}
+    if not all(isfinite(rating) for rating in ratings.values()):
+        raise ValueError("user ratings must be finite")
+    lowest, highest = min(ratings.values()), max(ratings.values())
+    if lowest == highest:
+        return set()
+    return {skill for skill, rating in ratings.items() if rating == lowest}
+
+
 def select_passage(
     model: SelectionModel,
     user_id: str,
@@ -96,9 +126,19 @@ def select_passage(
     *,
     seen_passage_ids: Collection[str] = (),
     seen_item_ids: Collection[str] = (),
+    skill_attempts: Mapping[str, int] | None = None,
     config: SelectionConfig = SelectionConfig(),
 ) -> SelectionResult:
-    """후보를 평가하고 다음 지문을 반환한다. 모델과 노출 기록은 수정하지 않는다."""
+    """누적 첫 응답 수와 노출 기록을 바탕으로 다음 지문을 고른다. 입력은 수정하지 않는다."""
+    counts = dict.fromkeys(SKILLS, 0)
+    for skill, attempts in (skill_attempts or {}).items():
+        if skill not in counts or type(attempts) is not int or attempts < 0:
+            raise ValueError(f"invalid skill attempt count for {skill!r}")
+        counts[skill] = attempts
+    cold_start = sum(counts.values()) < config.cold_start_attempts
+    target = max(config.target_p, config.cold_start_target_p) if cold_start else config.target_p
+    max_count = max(counts.values())
+
     by_id: dict[str, PassageCandidate] = {}
     for passage in candidates:
         if by_id.setdefault(passage.passage_id, passage) != passage:
@@ -106,6 +146,7 @@ def select_passage(
 
     excluded_seen = excluded_unregistered = 0
     scored = []
+    weakest = None
     for passage in by_id.values():
         if passage.passage_id in seen_passage_ids or any(q.item_id in seen_item_ids for q in passage.questions):
             excluded_seen += 1
@@ -117,9 +158,19 @@ def select_passage(
             continue
         if any(not 0 <= p <= 1 for p in probabilities):
             raise ValueError(f"invalid predicted probability for passage {passage.passage_id!r}")
+        if weakest is None:
+            weakest = set() if cold_start else _weakest_skills(model, user_id, counts, config.weakness_min_attempts)
         n = len(probabilities)
-        distance = fsum(abs(p - config.target_p) for p in probabilities) / n
-        scores = PassageScores(probabilities, fsum(probabilities) / n, config.target_p, distance, 1.0 - distance)
+        distance = fsum(abs(p - target) for p in probabilities) / n
+        weakness = config.weakness_weight * sum(q.skill in weakest for q in passage.questions) / n
+        coverage = 0.0
+        if max_count:
+            deficit = fsum((max_count - counts[q.skill]) / max_count for q in passage.questions)
+            coverage = config.coverage_weight * deficit / n
+        scores = PassageScores(
+            probabilities, fsum(probabilities) / n, target, distance, weakness, coverage,
+            1.0 - distance + weakness + coverage,
+        )
         tie = sha256(f"{user_id}\0{passage.passage_id}".encode()).digest()
         scored.append(((-scores.total_score, distance, tie, passage.passage_id), passage, scores))
 
@@ -127,4 +178,9 @@ def select_passage(
         reason = "no_eligible_passage" if by_id else "empty_catalog"
         return SelectionResult(None, None, (reason,), 0, excluded_seen, excluded_unregistered)
     _, passage, scores = min(scored, key=lambda row: row[0])
-    return SelectionResult(passage, scores, ("target_fit",), len(scored), excluded_seen, excluded_unregistered)
+    reasons = ["cold_start" if cold_start else "target_fit"]
+    if scores.weakness_bonus > 0:
+        reasons.append("weak_skill")
+    if scores.coverage_bonus > 0:
+        reasons.append("skill_coverage")
+    return SelectionResult(passage, scores, tuple(reasons), len(scored), excluded_seen, excluded_unregistered)
