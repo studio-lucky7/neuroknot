@@ -80,7 +80,10 @@ class Completion(LearningEvent):
     status: Literal["completed", "abandoned"]
 
 
-def parse_event(payload: Mapping) -> Exposure | Submission | Completion:
+Event = Exposure | Submission | Completion
+
+
+def parse_event(payload: Mapping) -> Event:
     """V1 JSON 객체를 검증하고 시각과 선택 필드를 정규화한다."""
     if not isinstance(payload, Mapping) or any(not isinstance(key, str) for key in payload):
         raise EventValidationError("event must be an object with string keys")
@@ -137,3 +140,36 @@ def parse_event(payload: Mapping) -> Exposure | Submission | Completion:
     if status not in ("completed", "abandoned"):
         raise EventValidationError("status must be completed or abandoned")
     return Completion(**common, occurred_at=timestamp, status=status)
+
+
+def parse_sequence(value: object, *, allow_zero: bool = False) -> int:
+    if isinstance(value, str) and re.fullmatch(r"0|[1-9][0-9]{0,18}", value):
+        value = int(value)
+    if type(value) is not int or not (0 if allow_zero else 1) <= value <= 2**63 - 1:
+        raise EventValidationError("invalid sequence; expected a canonical signed 64-bit position")
+    return value
+
+
+@dataclass(frozen=True)
+class EventEnvelope:
+    sequence: int
+    applied_at: datetime
+    event: Event
+
+    def to_dict(self) -> dict:
+        return {
+            "sequence": str(self.sequence),
+            "applied_at": self.applied_at.isoformat().replace("+00:00", "Z"),
+            "event": self.event.to_dict(),
+        }
+
+
+def parse_envelope(payload: Mapping) -> EventEnvelope:
+    if not isinstance(payload, Mapping) or payload.keys() != {"sequence", "applied_at", "event"}:
+        raise EventValidationError("envelope requires sequence, applied_at and event")
+    sequence = parse_sequence(payload["sequence"])
+    applied_at = parse_timestamp(payload["applied_at"], "applied_at")
+    event = parse_event(payload["event"])
+    if applied_at < event.occurred_at:
+        raise EventValidationError("applied_at cannot precede occurred_at")
+    return EventEnvelope(sequence, applied_at, event)

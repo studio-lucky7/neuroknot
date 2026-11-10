@@ -6,8 +6,8 @@ from collections import Counter
 from datetime import date, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from .learning_events import Completion, Exposure, Submission, parse_timestamp, require_id
-from .learning_history import AttemptTrace, LearningHistory
+from .learning_events import Completion, Exposure, parse_sequence, parse_timestamp, require_id
+from .learning_history import EventRecord, LearningHistory
 from .skills import SKILLS
 
 
@@ -23,15 +23,28 @@ def _current_streak(completed_days: set[date], today: date) -> int:
 
 
 def _skill_report(
-    answers: list[tuple[Submission, AttemptTrace]], zone: ZoneInfo, week_start: date, minimum: int,
+    answers: list[EventRecord], zone: ZoneInfo, week_start: date, minimum: int,
 ) -> dict:
     count = len(answers)
-    correct = sum(event.is_correct for event, _ in answers)
-    theta = answers[-1][1].theta_after if answers else None
+    correct = sum(record.event.is_correct for record in answers)
+    theta = answers[-1].attempt.theta_after if answers else None
     before_week = next(
-        (trace.theta_before for event, trace in answers if event.occurred_at.astimezone(zone).date() >= week_start),
+        (record.attempt.theta_before for record in answers
+         if (record.applied_at or record.event.occurred_at).astimezone(zone).date() >= week_start),
         theta,
     )
+    points = []
+    for record in answers:
+        point = {
+            "event_id": record.event.event_id,
+            "occurred_at": record.event.occurred_at.isoformat().replace("+00:00", "Z"),
+            "theta_before": record.attempt.theta_before,
+            "theta": record.attempt.theta_after,
+        }
+        if record.applied_at is not None:
+            point["sequence"] = str(record.sequence)
+            point["applied_at"] = record.applied_at.isoformat().replace("+00:00", "Z")
+        points.append(point)
     sufficient = count >= minimum
     return {
         "attempts": count,
@@ -40,15 +53,7 @@ def _skill_report(
         "theta": theta,
         "previous_theta": before_week,
         "theta_change": theta - before_week if count else None,
-        "theta_history": [
-            {
-                "event_id": event.event_id,
-                "occurred_at": event.occurred_at.isoformat().replace("+00:00", "Z"),
-                "theta_before": trace.theta_before,
-                "theta": trace.theta_after,
-            }
-            for event, trace in answers
-        ],
+        "theta_history": points,
         "has_sufficient_history": sufficient,
         "status": "no_data" if not count else ("observed" if sufficient else "insufficient_data"),
     }
@@ -61,6 +66,7 @@ def analyze_user(
     as_of: str,
     timezone_name: str = "Asia/Seoul",
     min_skill_attempts: int = 5,
+    through_sequence: int | str | None = None,
 ) -> dict:
     """기준 시각(포함)까지의 활동과 주간 시작 대비 Elo 변화량을 반환한다."""
     require_id(user_id, "user_id")
@@ -79,10 +85,18 @@ def analyze_user(
     exposures = retries = 0
     daily_answers: Counter[date] = Counter()
     daily_completions: Counter[date] = Counter()
-    answers: dict[str, list[tuple[Submission, AttemptTrace]]] = {skill: [] for skill in SKILLS}
-    for record in history.records:
+    cursor, records = history.read_records()
+    if through_sequence is not None:
+        requested = parse_sequence(through_sequence, allow_zero=True)
+        if cursor is None or requested > cursor:
+            raise ValueError("through_sequence is outside the available sequenced history")
+        cursor = requested
+    answers: dict[str, list[EventRecord]] = {skill: [] for skill in SKILLS}
+    for record in records:
         event = record.event
-        if event.occurred_at > cutoff:
+        if (record.applied_at or event.occurred_at) > cutoff:
+            break
+        if record.sequence is not None and record.sequence > cursor:
             break
         if event.user_id != user_id:
             continue
@@ -96,14 +110,14 @@ def analyze_user(
             retries += 1
         else:
             assert record.attempt is not None
-            answers[event.skill].append((event, record.attempt))
+            answers[event.skill].append(record)
             daily_answers[event.occurred_at.astimezone(zone).date()] += 1
 
     skills = {skill: _skill_report(rows, zone, week_start, min_skill_attempts) for skill, rows in answers.items()}
     attempts = daily_answers.total()
     correct = sum(report["correct"] for report in skills.values())
     days = [week_start + timedelta(days=offset) for offset in range(7)]
-    return {
+    report = {
         "version": 1,
         "user_id": user_id,
         "as_of": cutoff.isoformat().replace("+00:00", "Z"),
@@ -131,3 +145,6 @@ def analyze_user(
         "min_skill_attempts": min_skill_attempts,
         "skills": skills,
     }
+    if cursor is not None:
+        report["through_sequence"] = str(cursor)
+    return report
