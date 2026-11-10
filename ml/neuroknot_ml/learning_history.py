@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from threading import RLock
@@ -12,6 +12,7 @@ from .learning_events import (
     Completion, Event, EventEnvelope, EventValidationError, Exposure, Submission,
     parse_envelope, parse_event, require_id,
 )
+from .selection import PassageCandidate, SelectionConfig, SelectionResult, register_passage, select_passage
 from .skills import SKILLS
 
 
@@ -36,6 +37,41 @@ class CatalogItem:
         stars = self.difficulty
         if stars is not None and (type(stars) is not int or not 1 <= stars <= 5):
             raise EventValidationError("difficulty must be an integer from 1 to 5 or null")
+
+
+@dataclass(frozen=True)
+class QuizManifest:
+    passage_id: str
+    quiz_version: str
+    item_ids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        require_id(self.passage_id, "passage_id")
+        require_id(self.quiz_version, "quiz_version")
+        if not isinstance(self.item_ids, tuple) or len(self.item_ids) != 3:
+            raise EventValidationError("quiz manifest requires three item IDs")
+        for item_id in self.item_ids:
+            require_id(item_id, "item_id")
+        if len(set(self.item_ids)) != 3:
+            raise EventValidationError("quiz manifest item IDs must be distinct")
+
+
+@dataclass(frozen=True)
+class Recommendation:
+    through_sequence: int | None
+    selection: SelectionResult
+
+
+@dataclass(frozen=True)
+class _SelectionView:
+    probabilities: Mapping[str, float]
+    ratings: Mapping[str, float]
+
+    def predict(self, user_id: str, item_id: str) -> float:
+        return self.probabilities[item_id]
+
+    def user_rating(self, user_id: str, skill: str) -> float:
+        return self.ratings[skill]
 
 
 @dataclass(frozen=True)
@@ -68,10 +104,11 @@ def _event_key(event: Event) -> tuple[str, str]:
 
 
 class LearningHistory:
-    """고정된 초기 카탈로그로 모든 사용자의 이벤트를 한 순서로 처리한다."""
+    """모든 사용자의 이벤트와 공유 Elo를 소유한다."""
 
     def __init__(
         self, items: Iterable[CatalogItem], *, onboarding_levels: Mapping[str, str | None] | None = None,
+        quiz_catalog: Iterable[QuizManifest] = (),
     ) -> None:
         self._lock = RLock()
         self._model = EloModel()
@@ -81,6 +118,14 @@ class LearningHistory:
                 raise EventValidationError(f"duplicate catalog item ID: {item.item_id!r}")
             self._items[item.item_id] = item
             self._model.register_item(item.item_id, item.skill, item.difficulty)
+        self._quizzes: dict[tuple[str, str], QuizManifest] = {}
+        for quiz in quiz_catalog:
+            key = (quiz.passage_id, quiz.quiz_version)
+            if key in self._quizzes or any(item_id not in self._items for item_id in quiz.item_ids):
+                raise EventValidationError("duplicate quiz version or unknown quiz item")
+            if len({self._items[item_id].skill for item_id in quiz.item_ids}) != 3:
+                raise EventValidationError("quiz manifest requires three distinct skills")
+            self._quizzes[key] = quiz
         for user_id, level in (onboarding_levels or {}).items():
             require_id(user_id, "onboarding user_id")
             if level is not None:
@@ -120,6 +165,98 @@ class LearningHistory:
     def item_difficulty(self, item_id: str) -> float:
         with self._lock:
             return float(self._model.item_difficulty(item_id))
+
+    def predict(self, user_id: str, item_id: str) -> float:
+        with self._lock:
+            return self._model.predict(user_id, item_id)
+
+    @property
+    def catalog(self) -> tuple[CatalogItem, ...]:
+        with self._lock:
+            return tuple(self._items.values())
+
+    @property
+    def quiz_catalog(self) -> tuple[QuizManifest, ...]:
+        with self._lock:
+            return tuple(self._quizzes.values())
+
+    def register_generated(
+        self,
+        generated: Mapping,
+        item_ids: Sequence[str],
+        *,
+        quiz_version: str,
+        item_versions: Mapping[str, str],
+        item_difficulties: Mapping[str, int | None] | None = None,
+    ) -> PassageCandidate:
+        """Generation 문항을 공용 카탈로그와 Elo에 원자적으로 등록한다."""
+        candidate = PassageCandidate.from_generated(generated, item_ids)
+        quiz = QuizManifest(candidate.passage_id, quiz_version, tuple(q.item_id for q in candidate.questions))
+        if item_versions.keys() != set(quiz.item_ids):
+            raise EventValidationError("item_versions must match the candidate's item IDs")
+        overrides = {} if item_difficulties is None else dict(item_difficulties)
+        additions = {}
+        with self._lock:
+            key = (quiz.passage_id, quiz.quiz_version)
+            if self._quizzes.get(key, quiz) != quiz:
+                raise EventValidationError("quiz version is already bound to different item IDs")
+            for question in candidate.questions:
+                item_id = question.item_id
+                stars = overrides.get(item_id)
+                item = CatalogItem(
+                    item_id, item_versions[item_id], question.skill,
+                    candidate.difficulty_hint if stars is None else stars,
+                )
+                existing = self._items.get(item_id)
+                if existing is None:
+                    additions[item_id] = item
+                elif (existing.item_version, existing.skill) != (item.item_version, item.skill):
+                    raise EventValidationError("item ID is already bound to another version or skill")
+            if key not in self._quizzes:
+                quizzes = {**self._quizzes, key: quiz}
+                for record in self._processed.values():
+                    if isinstance(record.event, Exposure):
+                        _validate_quiz_exposure(record.event, quizzes)
+            register_passage(self._model, candidate, item_difficulties=overrides)
+            self._items.update(additions)
+            self._quizzes[key] = quiz
+        return candidate
+
+    def recommend(
+        self, user_id: str, candidates: Iterable[PassageCandidate], *, config: SelectionConfig = SelectionConfig(),
+    ) -> Recommendation:
+        """모델 점수와 이력을 한 커서에서 복사한 뒤 Core 선택기를 실행한다."""
+        require_id(user_id, "user_id")
+        candidates = tuple(candidates)
+        with self._lock:
+            cursor, records = self.read_records()
+            quiz_items = {(quiz.passage_id, quiz.item_ids) for quiz in self._quizzes.values()}
+            probabilities = {}
+            for candidate in candidates:
+                key = (candidate.passage_id, tuple(q.item_id for q in candidate.questions))
+                if key not in quiz_items:
+                    raise EventValidationError("candidate is not registered in the quiz catalog")
+                for question in candidate.questions:
+                    if self._items[question.item_id].skill != question.skill:
+                        raise EventValidationError("candidate skill does not match catalog")
+                    if question.item_id not in probabilities:
+                        probabilities[question.item_id] = self._model.predict(user_id, question.item_id)
+            view = _SelectionView(probabilities, {skill: self._model.user_rating(user_id, skill) for skill in SKILLS})
+            seen_passages, seen_items = set(), set()
+            counts = dict.fromkeys(SKILLS, 0)
+            for record in records:
+                event = record.event
+                if event.user_id != user_id:
+                    continue
+                if isinstance(event, Exposure):
+                    seen_passages.add(event.passage_id)
+                    seen_items.update(event.item_ids)
+                elif isinstance(event, Submission) and not event.is_retry:
+                    counts[event.skill] += 1
+        return Recommendation(cursor, select_passage(
+            view, user_id, candidates, seen_passage_ids=seen_passages, seen_item_ids=seen_items,
+            skill_attempts=counts, config=config,
+        ))
 
     def apply(self, payload: Mapping) -> EventRecord:
         """순번 도입 이전의 이벤트를 처리한다."""
@@ -199,6 +336,7 @@ class LearningHistory:
             for item_id in event.item_ids:
                 if item_id not in self._items:
                     raise EventValidationError(f"unknown exposed item: {item_id!r}")
+            _validate_quiz_exposure(event, self._quizzes)
             self._answered[event.exposure_id] = set()
         else:
             exposure = self._active_exposure(event)
@@ -286,9 +424,10 @@ class LearningHistory:
         envelopes: Iterable[Mapping],
         *,
         onboarding_levels: Mapping[str, str | None] | None = None,
+        quiz_catalog: Iterable[QuizManifest] = (),
     ) -> LearningHistory:
         """발급된 전역 순번으로 재생한다."""
-        history = cls(items, onboarding_levels=onboarding_levels)
+        history = cls(items, onboarding_levels=onboarding_levels, quiz_catalog=quiz_catalog)
         history.replay_suffix(envelopes)
         return history
 
@@ -297,3 +436,15 @@ class LearningHistory:
         with self._lock:
             for envelope in parsed:
                 self._apply_envelope(envelope)
+
+
+def _validate_quiz_exposure(event: Exposure, quizzes: Mapping[tuple[str, str], QuizManifest]) -> None:
+    quiz = quizzes.get((event.passage_id, event.quiz_version))
+    if quiz is not None:
+        if quiz.item_ids != event.item_ids:
+            raise EventValidationError("exposure items do not match quiz version")
+    elif any(
+        known.passage_id == event.passage_id or any(item_id in known.item_ids for item_id in event.item_ids)
+        for known in quizzes.values()
+    ):
+        raise EventValidationError("exposure does not match a registered passage and quiz version")
