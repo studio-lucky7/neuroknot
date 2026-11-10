@@ -115,3 +115,9 @@ python scripts/run_learning_analytics.py --seed 42 --user u0000 --timezone Asia/
 
 [이벤트 스키마와 NestJS·Prisma·Expo 연동 계약](LEARNING_ANALYTICS_V1.md)을 참고한다.
 [Prediction Core 통합 API와 복구 계약](LEARNING_ANALYTICS_INTEGRATION.md)도 참고한다.
+
+## Prediction Service Workflow V1
+
+`python scripts/run_service_workflow.py`는 검증된 합성 퀴즈로 추천, 실제 노출 확정,
+서버 채점, Elo 갱신, 완료, 분석, 체크포인트 복원 후 다음 학습을 실행한다.
+[공개·서버 데이터 경계와 FastAPI 입출력 초안](PREDICTION_SERVICE_WORKFLOW_V1.md)을 참고한다.
