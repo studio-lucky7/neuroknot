@@ -64,7 +64,11 @@ def main() -> None:
         parser.error("--seed must be nonnegative")
 
     items, levels, events = build_scenario(args.seed)
-    history = LearningHistory.replay(items, events, onboarding_levels=levels)
+    envelopes = [
+        {"sequence": str(sequence), "applied_at": event["occurred_at"], "event": event}
+        for sequence, event in enumerate(events, start=1)
+    ]
+    history = LearningHistory.replay_envelopes(items, envelopes, onboarding_levels=levels)
     report = analyze_user(history, args.user, as_of=events[-1]["occurred_at"], timezone_name=args.timezone)
     print(json.dumps(report, ensure_ascii=False, allow_nan=False, indent=2))
 

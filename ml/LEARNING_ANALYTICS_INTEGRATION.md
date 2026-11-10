@@ -1,8 +1,48 @@
 # Learning Analytics V1 · Prediction Core 통합 준비
 
-이 설계는 [Prediction Core V1 PR #11](https://github.com/studio-lucky7/neuroknot/pull/11)의
-`cdf7e87`을 읽기 전용으로 검토한 결과다. 아래 통합 API와 저장 계약은 병합 후 구현 대상이다.
-현재 테스트는 `develop`에 있는 Elo 공개 API만 사용한다.
+통합 브랜치는 [Prediction Core V1 PR #11](https://github.com/studio-lucky7/neuroknot/pull/11)의
+`cdf7e87` 위에 Learning Analytics V1과 순번·공유 상태·체크포인트를 연결한다.
+
+## 통합 API
+
+- `LearningHistory.register_generated(generated, item_ids, quiz_version=..., item_versions=...,
+  item_difficulties=...)`는 Core의 `PassageCandidate.from_generated()`와 `register_passage()`를
+  사용한다. 퀴즈 버전은 세 문항의 순서를 고정한다. 기존 문항 ID의 버전이나 스킬이 다르면 거부한다.
+- `recommend(user_id, candidates)`는 하나의 잠금 경계 안에서 복사한 확률·θ·노출·첫 응답 횟수를
+  Core의 `select_passage()`에 전달한다. 선택기는 Elo 인스턴스에 접근하지 않으며, 결과에
+  `through_sequence`가 붙는다. 실제 제공을 확정한 서버가 별도 노출 이벤트를 기록한다.
+- `accept_event(event, applied_at=...)`는 서버 경계에서 다음 순번을 발급한다.
+  이미 발급된 저장 봉투는 `apply_envelope()`로 적용하고, 전체 재생은 `replay_envelopes()`를 사용한다.
+  한 인스턴스에서 순번 경로와 기존 비순번 `apply()`/`replay()`를 혼용할 수 없다.
+- `checkpoint()`의 JSON은 버전, 스트림, 마지막 적용 순번, 모델 및 카탈로그·온보딩
+  식별자와 데이터, 순번별 원본 이벤트·처리 기록을 포함한다.
+  `from_checkpoint()`는 이력만 읽어 중복·최초 답안·종료 상태를 재구성하고,
+  Elo는 실제 `EloModel.from_state()`로 복원한다. `replay_suffix()`로 이후 봉투를 적용한다.
+
+```python
+import json
+
+saved = json.loads(json.dumps(history.checkpoint(), allow_nan=False))
+restored = LearningHistory.from_checkpoint(saved, expected_stream_id="learning")
+restored.replay_suffix(envelopes_after_checkpoint)
+report = analyze_user(restored, "u1", as_of="2026-01-05T15:00:00Z")
+```
+
+봉투 형식은 `{"sequence": "12", "applied_at": "2026-01-05T15:00:00Z", "event": {...}}`이다.
+`sequence`와 JSON 리포트의 `through_sequence`는 십진 문자열로 출력한다.
+순번이 있는 기록에서 `applied_at`은 단조 비감소이며 `occurred_at` 이상이어야 한다.
+순번이 비어 있거나 기존 순번에 다른 이벤트가 오면 오류다. 이미 수락한 이벤트의 재전송은
+원래 레코드를 반환한다. 새 별칭 ID는 로그 위치를 사용하지만 반환값은 원본 레코드다.
+
+체크포인트는 접두 구간의 전체 저널을 포함하므로 크기와 복구 비용이 이력 길이에 비례한다.
+접두 구간의 θ·b와 카운터를 원본 처리 기록과 비교하지만 신뢰할 수 있는 저장 계층을 전제로 한다.
+카탈로그 변경은 답안 봉투와 별도다. 체크포인트 이후 신규 퀴즈가 등록됐다면 서버가 저장한 해당
+카탈로그를 먼저 같은 ID·버전·유효 별점으로 등록한 뒤 이후 봉투를 적용한다.
+처음부터 재생할 때는 같은 불변 카탈로그와 온보딩을 전달한다.
+프로세스 내부 잠금은 하나의 인스턴스만 보호한다. 내구성 있는 저장, 다중 프로세스 순번 합의,
+응답 전 원자적 커밋과 노출 예약은 서비스 연동에 남아 있다.
+
+## 설계 근거
 
 ## Elo 상태 소유권
 
@@ -60,11 +100,10 @@ Core의 `select_passage()`는 호출자가 넘긴 모델의 `predict()`와 `user
 
 ## 전역 순서와 시간대
 
-현재 V1은 신규 이벤트가 이전 시각보다 빠르면 거부하고, 재생 시 UTC 시각으로 안정 정렬한다.
+기존 비순번 V1은 신규 이벤트가 이전 시각보다 빠르면 거부하고, 재생 시 UTC 시각으로 안정 정렬한다.
 동일 시각에 두 사용자가 같은 문항을 풀면 입력 배열 순서에 따라 두 번째 예측과 최종 b가 달라진다.
 통합 시에는 한 Elo 상태를 공유하는 스트림마다 서버가 확정한 `sequence`를 사용한다.
-동시각 이벤트에 대한 회귀 테스트는 현재 V1에서 외부 순번으로 정렬한 경우만 검증한다.
-서로 다른 시각의 이벤트가 순번과 반대로 들어오는 경우에는 기존 재생 정렬을 그대로 쓸 수 없다.
+통합 경로의 테스트는 동일 시각 공유 문항과 늦게 도착한 과거 활동을 순번대로 재생한다.
 
 | 구분 | 계약 |
 | --- | --- |
@@ -80,9 +119,9 @@ Core의 `select_passage()`는 호출자가 넘긴 모델의 `predict()`와 `user
 
 리포트는 조회한 `through_sequence`를 고정한다. `as_of` 시점까지 적용된 레코드만 조회하고,
 활동 건수는 그중 `occurred_at <= as_of`인 기록을 현지 날짜에 배치한다. θ의 주간 경계는
-`applied_at`을 사용한다. 현재 `analyze_user()`의 `occurred_at` 기준 조기 종료는
-시간순 저장을 전제로 하므로, 순번 기반 구현에서 그대로 유지하면 늦게 들어온 과거 활동을
-빠뜨릴 수 있다.
+`applied_at`을 사용한다. `analyze_user()`의 적용 시각 기준 필터는 순번에 따라 적용된 뒤의
+과거 활동을 원래 현지 날짜에 반영한다. 같은 분석 시점을 재현하려면 `as_of`와
+`through_sequence`를 함께 지정한다.
 
 ## 문항·버전 연결 계약
 
@@ -100,13 +139,10 @@ Core의 `register_passage()`는 기존 ID의 스킬 불일치를 거부하지만
 기존 `EloModel.register_item()`은 같은 ID의 b를 유지하면서 스킬 매핑을 바꿀 수 있으므로,
 연동 계층에서 ID·버전·스킬을 검증한 뒤 호출한다.
 
-## PR #11 병합 후 검증 순서
+## PR #11 병합 후 브랜치 정리
 
-1. 최신 `develop`과 병합 차이를 점검하고 README와 의존성의 양쪽 내용을 보존한다.
-2. 단일 소유자와 등록 어댑터를 연결한다. 명시 별점·힌트·중립 prior, 동일 ID 재등록,
-   스킬·버전 충돌, 선택기의 동일 커서 이력 사용을 실제 Core API로 테스트한다.
-3. 실제 `to_state()`/ `from_state()`로 **전체 재생과 체크포인트+이후 재생**의
-   예측·θ·b·카운터·과거 리포트를 비교한다. 커밋 전후 중단, 응답 전 종료 후 재전송,
-   오래된 별칭·충돌, 커서 누락과 설정 불일치도 포함한다.
-4. 순번 기반으로 동시각 공유 문항 답안, 역순 전달, 시간은 늦게 도착한 과거 활동,
-   서울 자정 경계와 순번 간격 검증을 실행한다. 이어 두 모듈의 전체 테스트와 실험을 재실행한다.
+Squash 병합 뒤 최신 `origin/develop`에서 PR용 브랜치를 만든다. 통합 브랜치와
+원래 Core HEAD `cdf7e87`의 트리 차이만 3-way 적용하거나, Analytics 원본 7개 커밋과
+통합 브랜치의 구현 커밋을 순서대로 옮긴다. Core 커밋과 두 브랜치를 묶은 merge 커밋은
+PR에 옮기지 않는다. README와 의존성 양쪽 내용을 확인하고 전체 테스트와 실험을 재실행한다.
+서비스 저장 계층이 생기면 커밋 직전·직후 프로세스 중단, 응답 유실 및 재전송을 추가 검증한다.

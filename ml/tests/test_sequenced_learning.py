@@ -76,3 +76,21 @@ def test_late_activity_is_grouped_by_seoul_date_but_theta_uses_application_time(
     assert before_late_event["through_sequence"] == "2"
     sunday_report = analyze_user(history, "u1", as_of=sunday)
     assert sunday_report["summary"]["first_attempts"] == 0
+
+
+def test_late_monday_activity_still_counts_in_monday_bucket_when_applied_on_tuesday():
+    monday = "2026-01-04T15:01:00Z"
+    tuesday = "2026-01-05T15:00:00Z"
+    history = LearningHistory.replay_envelopes(ITEMS, [
+        envelope(1, exposure(item_ids=["q1"], occurred_at=monday), monday),
+        envelope(2, submission(occurred_at=monday), tuesday),
+        envelope(3, completion(occurred_at=monday), tuesday),
+    ])
+
+    before = analyze_user(history, "u1", as_of="2026-01-05T14:59:59Z")
+    after = analyze_user(history, "u1", as_of=tuesday)
+    assert before["weekly"]["first_attempts"] == 0
+    assert after["weekly"]["days"][0] == {"date": "2026-01-05", "first_attempts": 1, "completed_sessions": 1}
+    assert after["weekly"]["days"][1]["first_attempts"] == 0
+    assert after["weekly"]["streak_days"] == 1
+    assert after["skills"]["fact"]["theta_history"][0]["applied_at"] == tuesday

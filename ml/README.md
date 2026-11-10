@@ -106,9 +106,12 @@ Windows 콘솔에서 한글이 깨지면 `PYTHONIOENCODING=utf-8`을 설정한�
 
 `LearningHistory`는 실제 노출, 서버 채점 결과, 학습 종료 이벤트를 처리한다. `analyze_user()`는
 기준 시각의 주간 활동, 완료 기반 연속 학습 일수와 스킬별 Elo 추정치를 JSON 호환 데이터로 반환한다.
+통합 경로에서 `register_generated()`와 `recommend()`는 같은 카탈로그·Elo를 사용하고,
+`checkpoint()`는 전역 순번과 원본 처리 기록을 함께 저장한다.
 
 ```bash
 python scripts/run_learning_analytics.py --seed 42 --user u0000 --timezone Asia/Seoul
 ```
 
 [이벤트 스키마와 NestJS·Prisma·Expo 연동 계약](LEARNING_ANALYTICS_V1.md)을 참고한다.
+[Prediction Core 통합 API와 복구 계약](LEARNING_ANALYTICS_INTEGRATION.md)도 참고한다.
