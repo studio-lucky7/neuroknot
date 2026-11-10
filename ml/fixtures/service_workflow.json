@@ -1,0 +1,114 @@
+[
+  {
+    "passage": {
+      "id": "demo-library",
+      "title": "도서관의 책 배달",
+      "category": "society",
+      "source": "합성 테스트 지문",
+      "source_url": "https://example.invalid/library",
+      "license": "CC0-1.0",
+      "body": "마을 도서관은 매주 수요일에 책 배달을 시작했다. 자원봉사자는 같은 방향의 집을 묶어 한 번에 방문했다. 덕분에 거동이 어려운 주민도 원하는 책을 정기적으로 빌릴 수 있었다."
+    },
+    "generated": {
+      "passage_id": "demo-library",
+      "prompt_version": "quiz_v2",
+      "model": "synthetic-fixture",
+      "quiz": {
+        "difficulty_hint": 1,
+        "questions": [
+          {
+            "skill": "fact", "stem": "책 배달은 매주 어느 요일에 이루어졌나요?",
+            "options": ["월요일", "수요일", "금요일", "일요일"], "answer_index": 1,
+            "evidence": "마을 도서관은 매주 수요일에 책 배달을 시작했다.",
+            "explanation": "첫 문장에서 도서관이 매주 수요일에 책을 배달한다고 밝힙니다.",
+            "distractors": [
+              {"option_index": 0, "why_wrong": "배달 요일은 월요일로 제시되지 않았습니다.", "error_type": "missed_detail"},
+              {"option_index": 2, "why_wrong": "금요일은 지문에서 배달 요일로 언급되지 않았습니다.", "error_type": "missed_detail"},
+              {"option_index": 3, "why_wrong": "일요일 배달에 관한 내용은 지문에 없습니다.", "error_type": "missed_detail"}
+            ]
+          },
+          {
+            "skill": "inference", "stem": "봉사자가 방문 순서를 이렇게 정한 이유로 적절한 것은?",
+            "options": ["방문 횟수를 늘리려고", "대출 기간을 줄이려고", "이동을 효율적으로 하려고", "도서관 문을 일찍 닫으려고"],
+            "answer_index": 2,
+            "evidence": "자원봉사자는 같은 방향의 집을 묶어 한 번에 방문했다.",
+            "explanation": "같은 방향의 집을 한 번에 방문하면 이동 경로를 효율적으로 정할 수 있습니다.",
+            "distractors": [
+              {"option_index": 0, "why_wrong": "한 번에 방문하므로 방문 횟수를 늘리려는 설명과 맞지 않습니다.", "error_type": "over_inference"},
+              {"option_index": 1, "why_wrong": "방문 순서와 대출 기간의 관계는 지문에 없습니다.", "error_type": "over_inference"},
+              {"option_index": 3, "why_wrong": "배달 순서가 도서관 마감 시간을 바꾼다는 근거는 없습니다.", "error_type": "over_inference"}
+            ]
+          },
+          {
+            "skill": "vocab", "stem": "마지막 문장에서 ‘거동’은 무엇을 뜻하나요?",
+            "options": ["몸을 움직이는 일", "책을 고르는 일", "주소를 쓰는 일", "시간을 정하는 일"],
+            "answer_index": 0,
+            "evidence": "덕분에 거동이 어려운 주민도 원하는 책을 정기적으로 빌릴 수 있었다.",
+            "explanation": "도서관까지 가기 어려운 주민의 상황에서 거동은 몸을 움직이는 일을 뜻합니다.",
+            "distractors": [
+              {"option_index": 1, "why_wrong": "책을 고르는 능력의 어려움을 말하는 문맥이 아닙니다.", "error_type": "vocab_confusion"},
+              {"option_index": 2, "why_wrong": "주소를 쓰는 행위는 이 문장에서 설명하지 않습니다.", "error_type": "vocab_confusion"},
+              {"option_index": 3, "why_wrong": "배달 시간을 정하는 어려움을 가리키는 말이 아닙니다.", "error_type": "vocab_confusion"}
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "passage": {
+      "id": "demo-garden",
+      "title": "학교 텃밭의 빗물",
+      "category": "science",
+      "source": "합성 테스트 지문",
+      "source_url": "https://example.invalid/garden",
+      "license": "CC0-1.0",
+      "body": "학생들은 텃밭 옆에 빗물 통을 설치했다. 뚜껑을 덮어 낙엽이 물에 섞이지 않도록 했다. 비가 적은 날에는 모아 둔 물로 텃밭을 돌봤다."
+    },
+    "generated": {
+      "passage_id": "demo-garden",
+      "prompt_version": "quiz_v2",
+      "model": "synthetic-fixture",
+      "quiz": {
+        "difficulty_hint": 2,
+        "questions": [
+          {
+            "skill": "fact", "stem": "학생들이 텃밭 옆에 설치한 것은 무엇인가요?",
+            "options": ["온도계", "새집", "빗물 통", "자전거 거치대"], "answer_index": 2,
+            "evidence": "학생들은 텃밭 옆에 빗물 통을 설치했다.",
+            "explanation": "첫 문장에서 학생들이 텃밭 옆에 빗물을 모을 통을 설치했다고 설명합니다.",
+            "distractors": [
+              {"option_index": 0, "why_wrong": "온도를 재는 기구를 설치했다는 내용은 없습니다.", "error_type": "missed_detail"},
+              {"option_index": 1, "why_wrong": "새를 위한 집을 놓았다는 설명은 지문에 없습니다.", "error_type": "missed_detail"},
+              {"option_index": 3, "why_wrong": "자전거를 보관할 시설은 언급되지 않았습니다.", "error_type": "missed_detail"}
+            ]
+          },
+          {
+            "skill": "inference", "stem": "학생들이 통을 덮은 이유는 무엇인가요?",
+            "options": ["저장한 물을 깨끗하게 유지하려고", "물의 온도를 높이려고", "식물이 자라는 속도를 늦추려고", "통을 눈에 띄게 꾸미려고"],
+            "answer_index": 0,
+            "evidence": "뚜껑을 덮어 낙엽이 물에 섞이지 않도록 했다.",
+            "explanation": "낙엽이 섞이지 않게 막으면 나중에 쓸 물을 비교적 깨끗하게 보관할 수 있습니다.",
+            "distractors": [
+              {"option_index": 1, "why_wrong": "뚜껑을 덮은 이유를 물의 온도와 연결할 근거가 없습니다.", "error_type": "over_inference"},
+              {"option_index": 2, "why_wrong": "식물의 성장 속도를 늦추려는 의도는 지문에 없습니다.", "error_type": "over_inference"},
+              {"option_index": 3, "why_wrong": "통을 꾸미기 위해 덮었다는 내용은 제시되지 않았습니다.", "error_type": "over_inference"}
+            ]
+          },
+          {
+            "skill": "vocab", "stem": "마지막 문장에서 ‘돌봤다’의 뜻과 가까운 것은?",
+            "options": ["잊어버렸다", "잘 자라도록 관리했다", "완전히 없앴다", "새 장소로 옮겼다"],
+            "answer_index": 1,
+            "evidence": "비가 적은 날에는 모아 둔 물로 텃밭을 돌봤다.",
+            "explanation": "모아 둔 물을 텃밭에 사용했다는 문맥에서 돌봤다는 잘 자라도록 관리했다는 뜻입니다.",
+            "distractors": [
+              {"option_index": 0, "why_wrong": "저장한 물을 사용했으므로 잊었다는 의미가 아닙니다.", "error_type": "vocab_confusion"},
+              {"option_index": 2, "why_wrong": "물을 주어 관리한 것이므로 텃밭을 없앤 행동이 아닙니다.", "error_type": "vocab_confusion"},
+              {"option_index": 3, "why_wrong": "텃밭의 위치를 바꾸었다는 의미는 지문에 없습니다.", "error_type": "vocab_confusion"}
+            ]
+          }
+        ]
+      }
+    }
+  }
+]
