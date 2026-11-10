@@ -43,8 +43,20 @@
 ![학습전](https://github.com/user-attachments/assets/3f202918-83dd-4f62-ad8a-86ed4f1d54a8)
 ![읽기](https://github.com/user-attachments/assets/08e7fae0-e084-46eb-b1b9-899155492d49)
 
-## NeuroKnot AI 로직 안내
-이 프로젝트에는 **AI 로직 2개**가 사용됩니다.  
+## 현재 구현과 연동 계획
+
+| 영역 | 저장소의 구현 상태 |
+| --- | --- |
+| Frontend | Expo SDK 58 / React Native의 학습 화면과 로컬 UI 상태. 서버 연동은 후속 작업입니다. |
+| Backend | Python / FastAPI의 상태 확인·OpenAPI와 SQLAlchemy·Alembic·MySQL 설정 기반. 업무 테이블과 API 계약은 팀 리뷰 후 추가합니다. |
+| Generation | 지문 기반 문항·해설 생성, 검증, 선택지 순서 섞기를 제공하는 독립 Python 모듈입니다. |
+| Prediction | `develop`에는 Elo·IRT 시뮬레이터와 온라인 평가가 있습니다. Core V1 및 Learning Analytics 연동은 별도 마일스톤입니다. |
+
+공통 아키텍처와 협업 절차는 [협업 가이드](CONTRIBUTING.md)를 따릅니다.
+Windows에서의 백엔드 실행과 Python 슬라이스 재사용 방법은 [백엔드 README](backend/README.md)에 정리했습니다.
+
+## NeuroKnot AI 로직 계획
+아래는 추천과 해설의 제품 연동 계획입니다.
 
 ### (1) 문제 추천 / 난이도 조정
 - **목적**: 학습 기록 기반 적절한 난이도의 문제 추천  

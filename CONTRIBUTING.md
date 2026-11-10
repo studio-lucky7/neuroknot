@@ -2,6 +2,14 @@
 
 뉴로넛은 세 명이 기능 단위(추천 · 해설 · 성장)로 나눠서 동시에 개발합니다. 서로의 작업을 덮어쓰지 않도록 아래 규칙을 지켜 주세요.
 
+## 공통 기술 기준
+
+앱은 Expo / React Native, 메인 백엔드는 Python / FastAPI를 사용합니다. 백엔드의 ORM은 SQLAlchemy,
+마이그레이션은 Alembic, 데이터베이스는 MySQL입니다. Generation과 Prediction은 각각 독립 Python 모듈로 유지합니다.
+현재 구현 범위는 [프로젝트 README](README.md)에서, 백엔드 실행·환경변수·연동 방법은
+[백엔드 README](backend/README.md)에서 확인할 수 있습니다.
+초기 계획에 없는 팀 승인 구현도 현재 기준으로 존중합니다. DB 스키마와 슬라이스 간 API 계약은 6절의 공통 리뷰 절차를 따릅니다.
+
 ## 0. 처음 시작하기
 
 ### 레포 받기
