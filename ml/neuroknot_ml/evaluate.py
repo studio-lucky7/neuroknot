@@ -40,7 +40,7 @@ def run_online(model: Predictor, attempts: pd.DataFrame) -> pd.DataFrame:
 
 
 def score(y_true, p_pred) -> dict[str, float]:
-    """AUC, log loss, Brier score. 한 클래스만 있으면 AUC는 NaN."""
+    """AUC, log loss, Brier score, ECE. 한 클래스만 있으면 AUC는 NaN."""
     y = np.asarray(y_true, dtype=int)
     p = np.clip(np.asarray(p_pred, dtype=float), _EPS, 1 - _EPS)
     auc = roc_auc_score(y, p) if len(np.unique(y)) == 2 else float("nan")
@@ -49,7 +49,45 @@ def score(y_true, p_pred) -> dict[str, float]:
         "auc": float(auc),
         "log_loss": float(log_loss(y, p, labels=[0, 1])),
         "brier": float(brier_score_loss(y, p)),
+        "ece": expected_calibration_error(y, p),
     }
+
+
+def reliability_table(y_true, p_pred, n_bins: int = 10) -> pd.DataFrame:
+    """예측 확률을 [0, 1] 등간격 구간으로 나눈 신뢰도 표.
+
+    컬럼: bin_lo, bin_hi, mean_pred(구간 내 예측 평균), accuracy(실제 정답률), count.
+    빈 구간은 count=0, mean_pred/accuracy=NaN. 1.0은 마지막 구간에 넣는다.
+    """
+    y = np.asarray(y_true, dtype=float)
+    p = np.asarray(p_pred, dtype=float)
+    edges = np.linspace(0.0, 1.0, n_bins + 1)
+    idx = np.clip(np.digitize(p, edges[1:-1]), 0, n_bins - 1)
+    count = np.bincount(idx, minlength=n_bins)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        mean_pred = np.bincount(idx, weights=p, minlength=n_bins) / count
+        accuracy = np.bincount(idx, weights=y, minlength=n_bins) / count
+    return pd.DataFrame(
+        {"bin_lo": edges[:-1], "bin_hi": edges[1:], "mean_pred": mean_pred, "accuracy": accuracy, "count": count}
+    )
+
+
+def expected_calibration_error(y_true, p_pred, n_bins: int = 10) -> float:
+    """ECE = Σ (구간 개수 / 전체 개수) · |구간 예측 평균 - 구간 실제 정답률|.
+
+    0이면 "70%라고 예측한 문제는 실제로 70% 맞았다"가 모든 구간에서 성립한다는 뜻.
+    """
+    table = reliability_table(y_true, p_pred, n_bins)
+    filled = table[table["count"] > 0]
+    gap = (filled["mean_pred"] - filled["accuracy"]).abs()
+    return float((gap * filled["count"]).sum() / filled["count"].sum())
+
+
+def calibration_in_the_large(y_true, p_pred) -> dict[str, float]:
+    """전체 평균 예측 vs 실제 정답률. diff > 0이면 전반적으로 과대 예측."""
+    mean_pred = float(np.mean(p_pred))
+    mean_actual = float(np.mean(np.asarray(y_true, dtype=float)))
+    return {"mean_pred": mean_pred, "mean_actual": mean_actual, "diff": mean_pred - mean_actual}
 
 
 def theta_recovery(model, user_skills: pd.DataFrame) -> dict[str, float]:
