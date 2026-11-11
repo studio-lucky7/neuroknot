@@ -1,3 +1,5 @@
+import pytest
+from fastapi import APIRouter
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
@@ -15,12 +17,26 @@ def offline_app():
     return create_app(Settings(_env_file=None, database_url=None, database_required=False))
 
 
-def test_health_and_openapi_work_without_mysql():
-    with TestClient(offline_app()) as client:
+@pytest.mark.parametrize("extra_router", [False, True], ids=["foundation", "with-slice-router"])
+def test_health_and_openapi_work_without_mysql(extra_router):
+    application = offline_app()
+    if extra_router:
+        router = APIRouter()
+
+        @router.get("/router-test")
+        def additional_health() -> dict:
+            return {"status": "test-router"}
+
+        application.include_router(router)
+
+    with TestClient(application) as client:
         assert client.get("/health").json() == {"status": "ok"}
         assert client.get("/docs").status_code == 200
         schema = client.get("/openapi.json").json()
-        assert set(schema["paths"]) == {"/health", "/health/db"}
+        assert {"/health", "/health/db"} <= set(schema["paths"])
+        if extra_router:
+            assert "/router-test" in schema["paths"]
+            assert client.get("/router-test").json() == {"status": "test-router"}
         assert schema["paths"]["/health/db"]["get"]["responses"]["503"]["content"]["application/json"]["schema"] == {
             "$ref": "#/components/schemas/ErrorResponse",
         }

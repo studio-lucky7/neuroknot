@@ -6,13 +6,26 @@ Git 이력의 `f7f46bb`와 전환 직전 develop `744f441`에서 확인할 수 �
 
 ## Windows PowerShell에서 실행
 
-Python 3.12를 사용한다. 저장소 루트에서 실행한다.
+Windows / Python 3.12.10에서 기본 테스트를 확인했다. 수민 님은
+[PR #12 리뷰](https://github.com/studio-lucky7/neuroknot/pull/12#pullrequestreview-5844314759)에서
+macOS / Python 3.14의 기존 기본 테스트 12개 통과와 서버 실행을 확인했다.
+아래 macOS/Linux 명령 중 Linux 환경과 Python 3.13 등 나머지 버전은 이번 작업에서 검증하지 않았다.
+저장소 루트에서 실행한다.
 
 ```powershell
 Set-Location backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+## macOS/Linux에서 실행
+
+```bash
+cd backend
+python3 -m venv .venv
+./.venv/bin/python -m pip install -r requirements-dev.txt
+./.venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 | 경로 | 용도 |
@@ -51,6 +64,13 @@ URL에 들어가는 자격 증명의 특수문자는 퍼센트 인코딩한다. 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
 .\.venv\Scripts\python.exe -m alembic heads
+```
+
+macOS/Linux의 같은 검증 명령은 다음과 같다.
+
+```bash
+./.venv/bin/python -m pytest
+./.venv/bin/python -m alembic heads
 ```
 
 기본 pytest는 MySQL 없이 실행한다. 실제 DB를 검사할 때는 테스트용
