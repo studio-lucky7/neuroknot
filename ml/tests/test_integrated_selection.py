@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import pytest
 
 import neuroknot_ml.learning_history as history_module
@@ -95,3 +97,27 @@ def test_selection_sees_one_cursor_and_cannot_mutate_elo(monkeypatch):
     exhausted = history.recommend("u2", [candidate])
     assert exhausted.through_sequence == 2 and exhausted.selection.passage is None
     assert history.event_log() == events
+
+
+@pytest.mark.parametrize("restore", [False, True], ids=["live", "restored"])
+@pytest.mark.parametrize("conflict", ["skill", "version"])
+def test_reused_item_id_rejects_skill_or_version_changes_atomically(restore, conflict):
+    history = LearningHistory([])
+    candidate = register_quiz(history, "p1", 2)
+    if restore:
+        history = LearningHistory.from_checkpoint(history.checkpoint())
+    before = deepcopy(history.checkpoint())
+    ids = [question.item_id for question in candidate.questions]
+    skills = [question.skill for question in candidate.questions]
+    versions = dict.fromkeys(ids, "v1")
+    if conflict == "skill":
+        skills[0], skills[1] = skills[1], skills[0]
+    else:
+        versions[ids[0]] = "v2"
+    generated = {"passage_id": "p1", "quiz": {
+        "difficulty_hint": 2, "questions": [{"skill": skill} for skill in skills],
+    }}
+
+    with pytest.raises(EventValidationError, match="another version or skill"):
+        history.register_generated(generated, ids, quiz_version="quiz-v1", item_versions=versions)
+    assert history.checkpoint() == before

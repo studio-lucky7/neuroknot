@@ -38,8 +38,9 @@ ECE는 log loss, Brier score, θ 복원력과 함께 해석한다. 그래프가 
 (oracle의 AUC 상한도 함께 낮아진다). 적응형 배정에서 중요한 건 "70%라고 보고 고른 문제를 실제로 70% 맞히는가"이므로
 ECE와 신뢰도 표(특히 0.6~0.8 구간)로 보정도를 확인하고, θ 복원력으로 실력 추정이 맞는지를 확인한다.
 
-이 Python 패키지와 실험 스크립트는 외부 API나 DB 없이 실행된다. 저장소의 NestJS 백엔드와 연결할 때는
-Prediction 입출력 계약을 기준으로 연동 계층을 구성한다.
+이 Python 패키지와 실험 스크립트는 외부 API나 DB 없이 실행된다. 팀이 확정한 FastAPI 백엔드와 연결할 때는
+Prediction 입출력 계약을 기준으로 연동 계층을 구성한다. 공통 기반은 PR #12에서 리뷰 중이며,
+실제 라우터·DB 테이블·트랜잭션 연결은 후속 합의와 구현 범위다.
 
 ## 구조
 
@@ -113,7 +114,7 @@ Windows 콘솔에서 한글이 깨지면 `PYTHONIOENCODING=utf-8`을 설정한�
 python scripts/run_learning_analytics.py --seed 42 --user u0000 --timezone Asia/Seoul
 ```
 
-[이벤트 스키마와 NestJS·Prisma·Expo 연동 계약](LEARNING_ANALYTICS_V1.md)을 참고한다.
+[이벤트 스키마와 FastAPI·SQLAlchemy·Expo 연동 경계](LEARNING_ANALYTICS_V1.md)를 참고한다.
 [Prediction Core 통합 API와 복구 계약](LEARNING_ANALYTICS_INTEGRATION.md)도 참고한다.
 
 ## Prediction Service Workflow V1
@@ -121,3 +122,17 @@ python scripts/run_learning_analytics.py --seed 42 --user u0000 --timezone Asia/
 `python scripts/run_service_workflow.py`는 검증된 합성 퀴즈로 추천, 실제 노출 확정,
 서버 채점, Elo 갱신, 완료, 분석, 체크포인트 복원 후 다음 학습을 실행한다.
 [공개·서버 데이터 경계와 FastAPI 입출력 초안](PREDICTION_SERVICE_WORKFLOW_V1.md)을 참고한다.
+
+## 초기 난이도와 추천 동점 진단
+
+```bash
+python scripts/diagnose_difficulty.py
+python scripts/diagnose_difficulty.py --generated-dir ../gen/out --passages-dir ../gen/fixtures
+```
+
+기본 입력은 검증된 합성 워크플로 fixture다. 실제 출력 디렉터리를 지정할 때는 각 파일이
+`GeneratedQuiz` JSON이어야 하며 원문 지문 디렉터리를 함께 제공한다. 입력은 읽기 전용으로 검증한다.
+진단은 난이도 힌트 분포, 온보딩 레벨별 초기 확률, 후보 간 점수 동점·근접 비율과 선택 결과를 JSON으로 출력한다.
+같은 자료에 가정한 슬롯별 별점 1·3·5를 적용한 경우와 모든 힌트를 2로 바꾼 경우도 별도로 비교한다.
+`--item-stars 2 3 4`, `--near-tolerance 0.01`로 민감도 조건을 바꿀 수 있다.
+[입력 출처, 결과와 해석 한계](PREDICTION_REVIEW_DIAGNOSTICS.md)를 함께 읽는다.

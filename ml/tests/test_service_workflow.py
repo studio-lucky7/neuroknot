@@ -127,7 +127,8 @@ def test_shared_item_keeps_one_difficulty_across_users():
     assert history["model"]["items"][first["item_id"]]["attempts"] == 2
 
 
-def test_versions_keep_ids_stable_and_old_exposure_keeps_original_grading():
+@pytest.mark.parametrize("restore", [False, True], ids=["live", "restored"])
+def test_versions_keep_ids_stable_and_old_exposure_keeps_original_grading(restore):
     service = PredictionService()
     fixture = load_fixtures()[0]
     first = register(service, fixture, item_difficulties={0: 3})
@@ -143,12 +144,24 @@ def test_versions_keep_ids_stable_and_old_exposure_keeps_original_grading():
     with pytest.raises(EventConflictError, match="quiz_version"):
         register(service, changed, item_difficulties={0: 3})
     second = register(service, changed, version="v2")
-    assert first["questions"][0]["item_id"] != second["questions"][0]["item_id"]
+    assert {q["item_id"] for q in first["questions"]}.isdisjoint(q["item_id"] for q in second["questions"])
+    if restore:
+        service = PredictionService.from_checkpoint(json.loads(json.dumps(service.checkpoint(), allow_nan=False)))
     assert service.recommend("u2")["quiz"] == second
     with pytest.raises(ValueError, match="not active"):
         confirm(service, first, user="u2", exposure="x2")
     assert service.submit_answer("u1", **answer(first, 0, "s1", 1))["is_correct"]
+    before_reregistration = service.checkpoint()
+    if restore:
+        service = PredictionService.from_checkpoint(json.loads(json.dumps(before_reregistration, allow_nan=False)))
+        assert service.checkpoint() == before_reregistration
+    learned = before_reregistration["history"]["model"]["items"][first["questions"][0]["item_id"]]
+    assert learned["attempts"] == 1 and learned["difficulty"] != 0.0
     assert register(service, fixture, item_difficulties={0: 3}) == first
+    assert service.checkpoint() == before_reregistration
+    with pytest.raises(EventConflictError, match="quiz_version"):
+        register(service, changed, item_difficulties={0: 3})
+    assert service.checkpoint() == before_reregistration
     assert service.recommend("u2")["quiz"] == second
 
 
