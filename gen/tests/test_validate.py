@@ -137,3 +137,43 @@ def test_여러_문항이_같은_근거를_쓰면_잡아낸다(passage):
     )
     problems = check_quiz(quiz, passage)
     assert any("같은 근거 문장" in p for p in problems)
+
+
+def test_오답_유형이_겹치면_잡아낸다(passage):
+    bad = make_question(
+        passage,
+        distractors=[
+            Distractor(option_index=0, why_wrong="지문은 다음 달부터라고 밝혔습니다.",
+                       error_type=ErrorType.MISSED_DETAIL),
+            Distractor(option_index=2, why_wrong="지문에 없는 시점을 추측한 것입니다.",
+                       error_type=ErrorType.MISSED_DETAIL),
+            Distractor(option_index=3, why_wrong="12월은 마스터플랜 수립 시점입니다.",
+                       error_type=ErrorType.SCOPE_CONFUSION),
+        ],
+    )
+    problems = check_quiz(make_quiz(passage, bad), passage)
+    assert any("오류 유형이 겹칩니다" in p for p in problems)
+
+
+def _longest_answer(passage, skill, evidence):
+    """정답(1번 자리)이 가장 긴 선택지인 문항."""
+    return make_question(
+        passage, skill=skill, evidence=evidence,
+        options=["이번 달부터", "다음 달부터 본격적으로", "내년 1월부터", "올해 12월부터"],
+    )
+
+
+def test_모든_문항에서_정답이_가장_길면_잡아낸다(passage):
+    paragraphs = passage.body.split("\n\n")
+    quiz = QuizSet(difficulty_hint=3, questions=[
+        _longest_answer(passage, Skill.FACT, paragraphs[1]),
+        _longest_answer(passage, Skill.INFERENCE, paragraphs[2]),
+        _longest_answer(passage, Skill.MAIN_IDEA, paragraphs[0]),
+    ])
+    problems = check_quiz(quiz, passage)
+    assert any("정답이 가장 긴 선택지" in p for p in problems)
+
+
+def test_한_문항만_정답이_가장_긴_건_허용한다(passage):
+    first = _longest_answer(passage, Skill.FACT, passage.body.split("\n\n")[1])
+    assert check_quiz(make_quiz(passage, first), passage) == []

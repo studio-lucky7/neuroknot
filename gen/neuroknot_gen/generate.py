@@ -13,7 +13,10 @@
 (schemas / validate / loader / prompts / run_generate 는 그대로 쓸 수 있다.)
 """
 
+import hashlib
 import os
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from google import genai
@@ -21,11 +24,34 @@ from google.genai import types
 
 from .schemas import GeneratedQuiz, Passage, QuizSet
 from .shuffle import shuffle_quiz
+from .skills import Skill
 
 DEFAULT_MODEL = "gemini-3.8-flash"
 MAX_OUTPUT_TOKENS = 16000
 PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
 DEFAULT_PROMPT_VERSION = "quiz_v2"
+
+# 스킬 조합을 모델이 스스로 고르던 버전. 이 버전들은 <출제할 능력>을 보내지 않는다.
+# (v2는 30문항 중 vocab 0개 — 모델은 늘 fact·inference·main_idea를 골랐다)
+MODEL_PICKS_SKILLS = {"quiz_v1", "quiz_v2"}
+
+
+def assigned_skills(passage_id: str) -> list[Skill]:
+    """이 지문에서 출제할 스킬 3개. 네 스킬 중 하나를 지문 ID로 정해 뺀다.
+
+    지문 ID만으로 정해지므로 다시 생성해도 같은 조합이 나오고, 지문이 많아지면
+    네 스킬이 각각 약 3/4의 지문에 고르게 나온다. (슬라이스 3이 스킬별 실력을 추정하려면
+    모든 스킬의 풀이 기록이 쌓여야 한다.)
+    """
+    skills = list(Skill)
+    digest = hashlib.sha256(passage_id.encode("utf-8")).digest()
+    skills.pop(int.from_bytes(digest[:8], "big") % len(skills))
+    return skills
+
+
+def skills_for(passage_id: str, prompt_version: str) -> list[Skill] | None:
+    """프롬프트 버전에 따라 출제할 스킬을 정한다. 모델이 고르는 옛 버전이면 None."""
+    return None if prompt_version in MODEL_PICKS_SKILLS else assigned_skills(passage_id)
 
 
 def model_name() -> str:
@@ -51,7 +77,11 @@ def load_prompt(version: str = DEFAULT_PROMPT_VERSION) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def build_user_content(passage: Passage, retry_notes: list[str] | None = None) -> str:
+def build_user_content(
+    passage: Passage,
+    retry_notes: list[str] | None = None,
+    skills: list[Skill] | None = None,
+) -> str:
     parts = [
         "<지문>",
         f"제목: {passage.title}",
@@ -60,6 +90,14 @@ def build_user_content(passage: Passage, retry_notes: list[str] | None = None) -
         passage.body,
         "</지문>",
     ]
+    if skills:
+        parts += [
+            "",
+            "<출제할 능력>",
+            "문항 3개를 아래 순서대로, 하나씩 이 능력을 측정하도록 만드십시오.",
+            *(f"{i}. {s.value}" for i, s in enumerate(skills, 1)),
+            "</출제할 능력>",
+        ]
     if retry_notes:
         parts += [
             "",
@@ -103,11 +141,12 @@ def generate_quiz(
 ) -> GeneratedQuiz:
     client = client or make_client()
     model = model_name()
+    skills = skills_for(passage.id, prompt_version)
 
     try:
         response = client.models.generate_content(
             model=model,
-            contents=build_user_content(passage, retry_notes),
+            contents=build_user_content(passage, retry_notes, skills),
             config=types.GenerateContentConfig(
                 system_instruction=load_prompt(prompt_version),
                 response_mime_type="application/json",
@@ -128,11 +167,18 @@ def generate_quiz(
     if not isinstance(quiz, QuizSet):  # 혹시 dict로 올 경우 대비
         quiz = QuizSet.model_validate(quiz)
 
+    # 요소별 점수가 있으면 난이도는 그 합계로 정한다 (모델이 쓴 1~5보다 이쪽을 믿는다)
+    if quiz.difficulty_factors is not None:
+        quiz = quiz.model_copy(update={"difficulty_hint": quiz.difficulty_factors.to_hint()})
+
     # 모델은 정답을 앞쪽에 몰아 두는 경향이 있어 코드로 자리를 섞는다
     quiz = shuffle_quiz(quiz, seed=passage.id)
 
     return GeneratedQuiz(
         passage_id=passage.id,
+        # 재시도도 새 생성이므로 호출할 때마다 새 ID를 붙인다
+        quiz_id=uuid.uuid4().hex,
+        generated_at=datetime.now(timezone.utc),
         prompt_version=prompt_version,
         model=model,
         quiz=quiz,

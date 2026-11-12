@@ -21,6 +21,7 @@ from neuroknot_gen.generate import (  # noqa: E402
     build_user_content,
     generate_quiz,
     load_prompt,
+    skills_for,
 )
 from neuroknot_gen.loader import load_all_passages, load_passage  # noqa: E402
 from neuroknot_gen.schemas import Passage  # noqa: E402
@@ -54,7 +55,7 @@ def run_one(passage: Passage, *, dry_run: bool, prompt_version: str) -> bool:
         print(f"\n{'=' * 72}\n[system]\n{'=' * 72}")
         print(load_prompt(prompt_version))
         print(f"\n{'=' * 72}\n[user]\n{'=' * 72}")
-        print(build_user_content(passage))
+        print(build_user_content(passage, skills=skills_for(passage.id, prompt_version)))
         return True
 
     generated = generate_quiz(passage, prompt_version=prompt_version)
