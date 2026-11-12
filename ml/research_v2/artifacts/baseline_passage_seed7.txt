@@ -1,0 +1,7 @@
+seed=7, users=200, passages=100, rounds=16, learning_rate=0.01
+                       n     auc  log_loss   brier     ece  accuracy  cold_accuracy  target_mae  coverage_gap
+random              9600  0.7618    0.5863  0.1998  0.0322    0.4875         0.4825      0.2808        0.0770
+legacy_adaptive     9600  0.7209    0.6088  0.2098  0.0379    0.5512         0.5550      0.1915        0.0904
+prediction_core_v1  9600  0.6533    0.6239  0.2166  0.0325    0.6210         0.6917      0.1356        0.0679
+
+target_mae: |p_pred - 0.7| 평균. coverage_gap: 사용자별 최다·최소 스킬 풀이 비율 차이의 평균.

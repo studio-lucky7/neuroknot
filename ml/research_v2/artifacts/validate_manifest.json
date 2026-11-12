@@ -1,0 +1,273 @@
+{
+  "phase": "validate",
+  "seeds": [
+    101,
+    211,
+    307,
+    401,
+    503
+  ],
+  "users": 60,
+  "passages": 60,
+  "rounds": 16,
+  "heldout_items": 40,
+  "learning_rate": 0.0,
+  "variants": {
+    "v1": {
+      "name": "v1",
+      "selection": {
+        "target_p": 0.7,
+        "cold_start_target_p": 0.8,
+        "cold_start_attempts": 6,
+        "weakness_min_attempts": 2,
+        "weakness_weight": 0.2,
+        "coverage_weight": 0.15
+      },
+      "random": false,
+      "user_k": {
+        "k0": 0.8,
+        "decay": 0.1,
+        "k_min": 0.1
+      },
+      "item_k": {
+        "k0": 0.4,
+        "decay": 0.1,
+        "k_min": 0.05
+      },
+      "level_scale": 1.0,
+      "star_scale": 1.0
+    },
+    "random": {
+      "name": "random",
+      "selection": {
+        "target_p": 0.7,
+        "cold_start_target_p": 0.8,
+        "cold_start_attempts": 6,
+        "weakness_min_attempts": 2,
+        "weakness_weight": 0.2,
+        "coverage_weight": 0.15
+      },
+      "random": true,
+      "user_k": {
+        "k0": 0.8,
+        "decay": 0.1,
+        "k_min": 0.1
+      },
+      "item_k": {
+        "k0": 0.4,
+        "decay": 0.1,
+        "k_min": 0.05
+      },
+      "level_scale": 1.0,
+      "star_scale": 1.0
+    },
+    "target_only": {
+      "name": "target_only",
+      "selection": {
+        "target_p": 0.7,
+        "cold_start_target_p": 0.8,
+        "cold_start_attempts": 0,
+        "weakness_min_attempts": 2,
+        "weakness_weight": 0,
+        "coverage_weight": 0
+      },
+      "random": false,
+      "user_k": {
+        "k0": 0.8,
+        "decay": 0.1,
+        "k_min": 0.1
+      },
+      "item_k": {
+        "k0": 0.4,
+        "decay": 0.1,
+        "k_min": 0.05
+      },
+      "level_scale": 1.0,
+      "star_scale": 1.0
+    },
+    "no_weakness": {
+      "name": "no_weakness",
+      "selection": {
+        "target_p": 0.7,
+        "cold_start_target_p": 0.8,
+        "cold_start_attempts": 6,
+        "weakness_min_attempts": 2,
+        "weakness_weight": 0,
+        "coverage_weight": 0.15
+      },
+      "random": false,
+      "user_k": {
+        "k0": 0.8,
+        "decay": 0.1,
+        "k_min": 0.1
+      },
+      "item_k": {
+        "k0": 0.4,
+        "decay": 0.1,
+        "k_min": 0.05
+      },
+      "level_scale": 1.0,
+      "star_scale": 1.0
+    },
+    "no_coverage": {
+      "name": "no_coverage",
+      "selection": {
+        "target_p": 0.7,
+        "cold_start_target_p": 0.8,
+        "cold_start_attempts": 6,
+        "weakness_min_attempts": 2,
+        "weakness_weight": 0.2,
+        "coverage_weight": 0
+      },
+      "random": false,
+      "user_k": {
+        "k0": 0.8,
+        "decay": 0.1,
+        "k_min": 0.1
+      },
+      "item_k": {
+        "k0": 0.4,
+        "decay": 0.1,
+        "k_min": 0.05
+      },
+      "level_scale": 1.0,
+      "star_scale": 1.0
+    },
+    "no_bonuses": {
+      "name": "no_bonuses",
+      "selection": {
+        "target_p": 0.7,
+        "cold_start_target_p": 0.8,
+        "cold_start_attempts": 6,
+        "weakness_min_attempts": 2,
+        "weakness_weight": 0,
+        "coverage_weight": 0
+      },
+      "random": false,
+      "user_k": {
+        "k0": 0.8,
+        "decay": 0.1,
+        "k_min": 0.1
+      },
+      "item_k": {
+        "k0": 0.4,
+        "decay": 0.1,
+        "k_min": 0.05
+      },
+      "level_scale": 1.0,
+      "star_scale": 1.0
+    },
+    "no_cold": {
+      "name": "no_cold",
+      "selection": {
+        "target_p": 0.7,
+        "cold_start_target_p": 0.8,
+        "cold_start_attempts": 0,
+        "weakness_min_attempts": 2,
+        "weakness_weight": 0.2,
+        "coverage_weight": 0.15
+      },
+      "random": false,
+      "user_k": {
+        "k0": 0.8,
+        "decay": 0.1,
+        "k_min": 0.1
+      },
+      "item_k": {
+        "k0": 0.4,
+        "decay": 0.1,
+        "k_min": 0.05
+      },
+      "level_scale": 1.0,
+      "star_scale": 1.0
+    },
+    "user_k_decay_0.2": {
+      "name": "user_k_decay_0.2",
+      "selection": {
+        "target_p": 0.7,
+        "cold_start_target_p": 0.8,
+        "cold_start_attempts": 6,
+        "weakness_min_attempts": 2,
+        "weakness_weight": 0.2,
+        "coverage_weight": 0.15
+      },
+      "random": false,
+      "user_k": {
+        "k0": 0.8,
+        "decay": 0.2,
+        "k_min": 0.1
+      },
+      "item_k": {
+        "k0": 0.4,
+        "decay": 0.1,
+        "k_min": 0.05
+      },
+      "level_scale": 1.0,
+      "star_scale": 1.0
+    },
+    "coverage_0075": {
+      "name": "coverage_0075",
+      "selection": {
+        "target_p": 0.7,
+        "cold_start_target_p": 0.8,
+        "cold_start_attempts": 6,
+        "weakness_min_attempts": 2,
+        "weakness_weight": 0.2,
+        "coverage_weight": 0.075
+      },
+      "random": false,
+      "user_k": {
+        "k0": 0.8,
+        "decay": 0.1,
+        "k_min": 0.1
+      },
+      "item_k": {
+        "k0": 0.4,
+        "decay": 0.1,
+        "k_min": 0.05
+      },
+      "level_scale": 1.0,
+      "star_scale": 1.0
+    },
+    "coverage_030": {
+      "name": "coverage_030",
+      "selection": {
+        "target_p": 0.7,
+        "cold_start_target_p": 0.8,
+        "cold_start_attempts": 6,
+        "weakness_min_attempts": 2,
+        "weakness_weight": 0.2,
+        "coverage_weight": 0.3
+      },
+      "random": false,
+      "user_k": {
+        "k0": 0.8,
+        "decay": 0.1,
+        "k_min": 0.1
+      },
+      "item_k": {
+        "k0": 0.4,
+        "decay": 0.1,
+        "k_min": 0.05
+      },
+      "level_scale": 1.0,
+      "star_scale": 1.0
+    }
+  },
+  "python": "3.12.10",
+  "dependencies": {
+    "numpy": "2.5.4",
+    "pandas": "3.1.1",
+    "scipy": "1.18.1",
+    "scikit-learn": "1.9.1",
+    "pytest": "9.2.0",
+    "pydantic": "2.14.3"
+  },
+  "base_commit": "d17ac32",
+  "source_sha256": {
+    "experiment.py": "5177f8f43b1a355e823c51204b5dc800c0de42050b0d66630a046bb62e5526be",
+    "replay.py": "e4aeede924de30912cd7793ccf047da83a9f4fa7aca5d1f1f4e7963827fafb89",
+    "run.py": "027929c392a03860af944a0273c4e602461a89be225d143d383eb011d170cd1b",
+    "__init__.py": "bf295e30d60e5e0c3345b6e4a81060c549060c64bf06ada5de5cd9fbada71197"
+  }
+}

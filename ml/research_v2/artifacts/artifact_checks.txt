@@ -1,0 +1,5 @@
+tune: 93 seed/config runs; summaries and paired CI recomputed successfully
+validate: 50 seed/config runs; summaries and paired CI recomputed successfully
+learning: 50 seed/config runs; summaries and paired CI recomputed successfully
+replay: 20 seed/config runs; summaries and paired CI recomputed successfully
+Frozen tuning hash and disjoint seeds verified; all recorded source hashes match

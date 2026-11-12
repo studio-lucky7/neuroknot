@@ -1,0 +1,177 @@
+{
+  "data": "synthetic_test_fixtures",
+  "first_passage": "demo-library",
+  "shared_passage": "demo-library",
+  "first_answer": {
+    "submission_id": "alice-1:0",
+    "is_correct": false,
+    "is_retry": false,
+    "sequence": "2"
+  },
+  "retry": {
+    "submission_id": "alice-1:retry",
+    "is_correct": true,
+    "is_retry": true,
+    "sequence": "3"
+  },
+  "duplicate_after_restore": {
+    "submission_id": "alice-1:0",
+    "is_correct": false,
+    "is_retry": false,
+    "sequence": "2"
+  },
+  "shared_item_elo_updates": 2,
+  "restored_from_sequence": "11",
+  "next_passage": "demo-garden",
+  "final_sequence": "16",
+  "matches_uninterrupted_run": true,
+  "summary": {
+    "first_attempts": 6,
+    "correct_first_attempts": 5,
+    "observed_accuracy": 0.8333333333333334,
+    "retries": 1,
+    "exposures": 2,
+    "exposed_passages": 2,
+    "completed_sessions": 2
+  },
+  "weekly": {
+    "week_start": "2026-01-05",
+    "first_attempts": 3,
+    "completed_sessions": 1,
+    "streak_days": 2,
+    "days": [
+      {
+        "date": "2026-01-05",
+        "first_attempts": 3,
+        "completed_sessions": 1
+      },
+      {
+        "date": "2026-01-06",
+        "first_attempts": 0,
+        "completed_sessions": 0
+      },
+      {
+        "date": "2026-01-07",
+        "first_attempts": 0,
+        "completed_sessions": 0
+      },
+      {
+        "date": "2026-01-08",
+        "first_attempts": 0,
+        "completed_sessions": 0
+      },
+      {
+        "date": "2026-01-09",
+        "first_attempts": 0,
+        "completed_sessions": 0
+      },
+      {
+        "date": "2026-01-10",
+        "first_attempts": 0,
+        "completed_sessions": 0
+      },
+      {
+        "date": "2026-01-11",
+        "first_attempts": 0,
+        "completed_sessions": 0
+      }
+    ]
+  },
+  "skills": {
+    "fact": {
+      "attempts": 2,
+      "correct": 1,
+      "observed_accuracy": 0.5,
+      "theta": -0.3263753286973345,
+      "previous_theta": -0.6656147081071396,
+      "theta_change": 0.33923937940980514,
+      "theta_history": [
+        {
+          "event_id": "workflow:submission:alice-1:0",
+          "occurred_at": "2026-01-04T14:59:00Z",
+          "theta_before": 0.0,
+          "theta": -0.6656147081071396,
+          "sequence": "2",
+          "applied_at": "2026-01-04T14:59:00Z"
+        },
+        {
+          "event_id": "workflow:submission:alice-2:0",
+          "occurred_at": "2026-01-04T15:00:00Z",
+          "theta_before": -0.6656147081071396,
+          "theta": -0.3263753286973345,
+          "sequence": "13",
+          "applied_at": "2026-01-04T15:00:00Z"
+        }
+      ],
+      "has_sufficient_history": false,
+      "status": "insufficient_data"
+    },
+    "inference": {
+      "attempts": 2,
+      "correct": 2,
+      "observed_accuracy": 1.0,
+      "theta": 0.3395022965416477,
+      "previous_theta": 0.13438529189286044,
+      "theta_change": 0.20511700464878727,
+      "theta_history": [
+        {
+          "event_id": "workflow:submission:alice-1:1",
+          "occurred_at": "2026-01-04T14:59:00Z",
+          "theta_before": 0.0,
+          "theta": 0.13438529189286044,
+          "sequence": "4",
+          "applied_at": "2026-01-04T14:59:00Z"
+        },
+        {
+          "event_id": "workflow:submission:alice-2:1",
+          "occurred_at": "2026-01-04T15:00:00Z",
+          "theta_before": 0.13438529189286044,
+          "theta": 0.3395022965416477,
+          "sequence": "14",
+          "applied_at": "2026-01-04T15:00:00Z"
+        }
+      ],
+      "has_sufficient_history": false,
+      "status": "insufficient_data"
+    },
+    "vocab": {
+      "attempts": 2,
+      "correct": 2,
+      "observed_accuracy": 1.0,
+      "theta": 0.3395022965416477,
+      "previous_theta": 0.13438529189286044,
+      "theta_change": 0.20511700464878727,
+      "theta_history": [
+        {
+          "event_id": "workflow:submission:alice-1:2",
+          "occurred_at": "2026-01-04T14:59:00Z",
+          "theta_before": 0.0,
+          "theta": 0.13438529189286044,
+          "sequence": "5",
+          "applied_at": "2026-01-04T14:59:00Z"
+        },
+        {
+          "event_id": "workflow:submission:alice-2:2",
+          "occurred_at": "2026-01-04T15:00:00Z",
+          "theta_before": 0.13438529189286044,
+          "theta": 0.3395022965416477,
+          "sequence": "15",
+          "applied_at": "2026-01-04T15:00:00Z"
+        }
+      ],
+      "has_sufficient_history": false,
+      "status": "insufficient_data"
+    },
+    "main_idea": {
+      "attempts": 0,
+      "correct": 0,
+      "observed_accuracy": null,
+      "theta": null,
+      "previous_theta": null,
+      "theta_change": null,
+      "theta_history": [],
+      "has_sufficient_history": false,
+      "status": "no_data"
+    }
+  }
+}

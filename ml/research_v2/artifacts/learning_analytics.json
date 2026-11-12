@@ -1,0 +1,174 @@
+{
+  "version": 1,
+  "user_id": "u0000",
+  "as_of": "2026-01-11T14:59:59.216871Z",
+  "timezone": "Asia/Seoul",
+  "data_status": "available",
+  "summary": {
+    "first_attempts": 8,
+    "correct_first_attempts": 3,
+    "observed_accuracy": 0.375,
+    "retries": 2,
+    "exposures": 8,
+    "exposed_passages": 8,
+    "completed_sessions": 7
+  },
+  "weekly": {
+    "week_start": "2026-01-05",
+    "first_attempts": 8,
+    "completed_sessions": 7,
+    "streak_days": 0,
+    "days": [
+      {
+        "date": "2026-01-05",
+        "first_attempts": 8,
+        "completed_sessions": 7
+      },
+      {
+        "date": "2026-01-06",
+        "first_attempts": 0,
+        "completed_sessions": 0
+      },
+      {
+        "date": "2026-01-07",
+        "first_attempts": 0,
+        "completed_sessions": 0
+      },
+      {
+        "date": "2026-01-08",
+        "first_attempts": 0,
+        "completed_sessions": 0
+      },
+      {
+        "date": "2026-01-09",
+        "first_attempts": 0,
+        "completed_sessions": 0
+      },
+      {
+        "date": "2026-01-10",
+        "first_attempts": 0,
+        "completed_sessions": 0
+      },
+      {
+        "date": "2026-01-11",
+        "first_attempts": 0,
+        "completed_sessions": 0
+      }
+    ]
+  },
+  "min_skill_attempts": 5,
+  "skills": {
+    "fact": {
+      "attempts": 3,
+      "correct": 1,
+      "observed_accuracy": 0.3333333333333333,
+      "theta": -0.2667122726132115,
+      "previous_theta": 0.3,
+      "theta_change": -0.5667122726132114,
+      "theta_history": [
+        {
+          "event_id": "a3",
+          "occurred_at": "2026-01-05T02:47:54.763078Z",
+          "theta_before": 0.3,
+          "theta": -0.0020325350385163587,
+          "sequence": "12",
+          "applied_at": "2026-01-05T02:47:54.763078Z"
+        },
+        {
+          "event_id": "a4",
+          "occurred_at": "2026-01-05T02:48:20.326652Z",
+          "theta_before": -0.0020325350385163587,
+          "theta": 0.22375689450461284,
+          "sequence": "16",
+          "applied_at": "2026-01-05T02:48:20.326652Z"
+        },
+        {
+          "event_id": "a5",
+          "occurred_at": "2026-01-05T02:48:56.124714Z",
+          "theta_before": 0.22375689450461284,
+          "theta": -0.2667122726132115,
+          "sequence": "19",
+          "applied_at": "2026-01-05T02:48:56.124714Z"
+        }
+      ],
+      "has_sufficient_history": false,
+      "status": "insufficient_data"
+    },
+    "inference": {
+      "attempts": 2,
+      "correct": 1,
+      "observed_accuracy": 0.5,
+      "theta": 0.36628780640652087,
+      "previous_theta": 0.3,
+      "theta_change": 0.06628780640652088,
+      "theta_history": [
+        {
+          "event_id": "a0",
+          "occurred_at": "2026-01-05T02:39:06.071470Z",
+          "theta_before": 0.3,
+          "theta": -0.15955401344932724,
+          "sequence": "2",
+          "applied_at": "2026-01-05T02:39:06.071470Z"
+        },
+        {
+          "event_id": "a7",
+          "occurred_at": "2026-01-05T02:49:40.312539Z",
+          "theta_before": -0.15955401344932724,
+          "theta": 0.36628780640652087,
+          "sequence": "25",
+          "applied_at": "2026-01-05T02:49:40.312539Z"
+        }
+      ],
+      "has_sufficient_history": false,
+      "status": "insufficient_data"
+    },
+    "vocab": {
+      "attempts": 3,
+      "correct": 1,
+      "observed_accuracy": 0.3333333333333333,
+      "theta": 0.013202830030868529,
+      "previous_theta": 0.3,
+      "theta_change": -0.28679716996913146,
+      "theta_history": [
+        {
+          "event_id": "a1",
+          "occurred_at": "2026-01-05T02:41:04.426586Z",
+          "theta_before": 0.3,
+          "theta": -0.0020325350385163587,
+          "sequence": "5",
+          "applied_at": "2026-01-05T02:41:04.426586Z"
+        },
+        {
+          "event_id": "a2",
+          "occurred_at": "2026-01-05T02:47:04.044650Z",
+          "theta_before": -0.0020325350385163587,
+          "theta": -0.22718955895488194,
+          "sequence": "9",
+          "applied_at": "2026-01-05T02:47:04.044650Z"
+        },
+        {
+          "event_id": "a6",
+          "occurred_at": "2026-01-05T02:49:28.645515Z",
+          "theta_before": -0.22718955895488194,
+          "theta": 0.013202830030868529,
+          "sequence": "22",
+          "applied_at": "2026-01-05T02:49:28.645515Z"
+        }
+      ],
+      "has_sufficient_history": false,
+      "status": "insufficient_data"
+    },
+    "main_idea": {
+      "attempts": 0,
+      "correct": 0,
+      "observed_accuracy": null,
+      "theta": null,
+      "previous_theta": null,
+      "theta_change": null,
+      "theta_history": [],
+      "has_sufficient_history": false,
+      "status": "no_data"
+    }
+  },
+  "through_sequence": "103"
+}

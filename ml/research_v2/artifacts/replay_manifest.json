@@ -1,0 +1,20 @@
+{
+  "seeds": [
+    101,
+    211,
+    307,
+    401,
+    503
+  ],
+  "variants": [
+    "v1",
+    "user_k_decay_0.2",
+    "coverage_0075",
+    "coverage_030"
+  ],
+  "reference": "v1",
+  "learning_rate": 0,
+  "users": 60,
+  "passages": 60,
+  "rounds": 16
+}

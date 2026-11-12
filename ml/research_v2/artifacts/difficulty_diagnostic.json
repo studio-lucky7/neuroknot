@@ -1,0 +1,333 @@
+{
+  "source": "synthetic_test_fixtures",
+  "diagnostic_quiz_version": "diagnostic-v1",
+  "input_passage_ids": [
+    "demo-garden",
+    "demo-library"
+  ],
+  "passage_count": 2,
+  "skill_validation": "Generation schema, evidence checks and three distinct Prediction skills",
+  "difficulty_hints": {
+    "1": {
+      "count": 1,
+      "fraction": 0.5
+    },
+    "2": {
+      "count": 1,
+      "fraction": 0.5
+    },
+    "3": {
+      "count": 0,
+      "fraction": 0.0
+    },
+    "4": {
+      "count": 0,
+      "fraction": 0.0
+    },
+    "5": {
+      "count": 0,
+      "fraction": 0.0
+    }
+  },
+  "near_tolerance": 0.01,
+  "baseline_hint_only": {
+    "warming_up": {
+      "initial_probabilities": {
+        "count": 6,
+        "unique_values": 2,
+        "min": 0.45016600268752216,
+        "mean": 0.5479111544566587,
+        "max": 0.6456563062257954
+      },
+      "candidate_scores": {
+        "count": 2,
+        "unique_values": 2,
+        "min": 0.650166002687522,
+        "mean": 0.7479111544566587,
+        "max": 0.8456563062257954
+      },
+      "candidate_pair_count": 1,
+      "equal_score_pairs": 0,
+      "near_score_pairs_including_equal": 0,
+      "near_pair_fraction": 0.0,
+      "top_rank_ties": 1,
+      "hash_decides_winner": false,
+      "selected_passage_id": "demo-library"
+    },
+    "cruising": {
+      "initial_probabilities": {
+        "count": 6,
+        "unique_values": 2,
+        "min": 0.6224593312018546,
+        "mean": 0.7041471571222067,
+        "max": 0.7858349830425586
+      },
+      "candidate_scores": {
+        "count": 2,
+        "unique_values": 2,
+        "min": 0.8224593312018545,
+        "mean": 0.9041471571222066,
+        "max": 0.9858349830425586
+      },
+      "candidate_pair_count": 1,
+      "equal_score_pairs": 0,
+      "near_score_pairs_including_equal": 0,
+      "near_pair_fraction": 0.0,
+      "top_rank_ties": 1,
+      "hash_decides_winner": false,
+      "selected_passage_id": "demo-library"
+    },
+    "high_speed": {
+      "initial_probabilities": {
+        "count": 6,
+        "unique_values": 2,
+        "min": 0.7502601055951177,
+        "mean": 0.8100758156160599,
+        "max": 0.8698915256370021
+      },
+      "candidate_scores": {
+        "count": 2,
+        "unique_values": 2,
+        "min": 0.9301084743629979,
+        "mean": 0.9401842899790578,
+        "max": 0.9502601055951176
+      },
+      "candidate_pair_count": 1,
+      "equal_score_pairs": 0,
+      "near_score_pairs_including_equal": 0,
+      "near_pair_fraction": 0.0,
+      "top_rank_ties": 1,
+      "hash_decides_winner": false,
+      "selected_passage_id": "demo-garden"
+    },
+    "autonomous": {
+      "initial_probabilities": {
+        "count": 6,
+        "unique_values": 2,
+        "min": 0.8581489350995123,
+        "mean": 0.8945052573780828,
+        "max": 0.9308615796566533
+      },
+      "candidate_scores": {
+        "count": 2,
+        "unique_values": 2,
+        "min": 0.8691384203433468,
+        "mean": 0.9054947426219173,
+        "max": 0.9418510649004878
+      },
+      "candidate_pair_count": 1,
+      "equal_score_pairs": 0,
+      "near_score_pairs_including_equal": 0,
+      "near_pair_fraction": 0.0,
+      "top_rank_ties": 1,
+      "hash_decides_winner": false,
+      "selected_passage_id": "demo-garden"
+    }
+  },
+  "illustrative_item_stars_by_slot": [
+    1,
+    3,
+    5
+  ],
+  "illustrative_item_stars": {
+    "warming_up": {
+      "initial_probabilities": {
+        "count": 6,
+        "unique_values": 3,
+        "min": 0.06913842034334682,
+        "mean": 0.3279120493130458,
+        "max": 0.6456563062257954
+      },
+      "candidate_scores": {
+        "count": 2,
+        "unique_values": 1,
+        "min": 0.5279120493130458,
+        "mean": 0.5279120493130458,
+        "max": 0.5279120493130458
+      },
+      "candidate_pair_count": 1,
+      "equal_score_pairs": 1,
+      "near_score_pairs_including_equal": 1,
+      "near_pair_fraction": 1.0,
+      "top_rank_ties": 2,
+      "hash_decides_winner": true,
+      "selected_passage_id": "demo-library"
+    },
+    "cruising": {
+      "initial_probabilities": {
+        "count": 6,
+        "unique_values": 3,
+        "min": 0.13010847436299783,
+        "mean": 0.4471669801979658,
+        "max": 0.7858349830425586
+      },
+      "candidate_scores": {
+        "count": 2,
+        "unique_values": 1,
+        "min": 0.6471669801979658,
+        "mean": 0.6471669801979658,
+        "max": 0.6471669801979658
+      },
+      "candidate_pair_count": 1,
+      "equal_score_pairs": 1,
+      "near_score_pairs_including_equal": 1,
+      "near_pair_fraction": 1.0,
+      "top_rank_ties": 2,
+      "hash_decides_winner": true,
+      "selected_passage_id": "demo-garden"
+    },
+    "high_speed": {
+      "initial_probabilities": {
+        "count": 6,
+        "unique_values": 3,
+        "min": 0.2141650169574414,
+        "mean": 0.5528330198020343,
+        "max": 0.8698915256370021
+      },
+      "candidate_scores": {
+        "count": 2,
+        "unique_values": 1,
+        "min": 0.7062386693773661,
+        "mean": 0.7062386693773661,
+        "max": 0.7062386693773661
+      },
+      "candidate_pair_count": 1,
+      "equal_score_pairs": 1,
+      "near_score_pairs_including_equal": 1,
+      "near_pair_fraction": 1.0,
+      "top_rank_ties": 2,
+      "hash_decides_winner": true,
+      "selected_passage_id": "demo-garden"
+    },
+    "autonomous": {
+      "initial_probabilities": {
+        "count": 6,
+        "unique_values": 3,
+        "min": 0.35434369377420455,
+        "mean": 0.6720879506869543,
+        "max": 0.9308615796566533
+      },
+      "candidate_scores": {
+        "count": 2,
+        "unique_values": 1,
+        "min": 0.7848468975825187,
+        "mean": 0.7848468975825187,
+        "max": 0.7848468975825187
+      },
+      "candidate_pair_count": 1,
+      "equal_score_pairs": 1,
+      "near_score_pairs_including_equal": 1,
+      "near_pair_fraction": 1.0,
+      "top_rank_ties": 2,
+      "hash_decides_winner": true,
+      "selected_passage_id": "demo-library"
+    }
+  },
+  "selection_changed_by_illustrative_stars": {
+    "warming_up": false,
+    "cruising": true,
+    "high_speed": false,
+    "autonomous": true
+  },
+  "counterfactual_uniform_hint_2": {
+    "warming_up": {
+      "initial_probabilities": {
+        "count": 6,
+        "unique_values": 1,
+        "min": 0.45016600268752216,
+        "mean": 0.4501660026875222,
+        "max": 0.45016600268752216
+      },
+      "candidate_scores": {
+        "count": 2,
+        "unique_values": 1,
+        "min": 0.650166002687522,
+        "mean": 0.650166002687522,
+        "max": 0.650166002687522
+      },
+      "candidate_pair_count": 1,
+      "equal_score_pairs": 1,
+      "near_score_pairs_including_equal": 1,
+      "near_pair_fraction": 1.0,
+      "top_rank_ties": 2,
+      "hash_decides_winner": true,
+      "selected_passage_id": "demo-library"
+    },
+    "cruising": {
+      "initial_probabilities": {
+        "count": 6,
+        "unique_values": 1,
+        "min": 0.6224593312018546,
+        "mean": 0.6224593312018546,
+        "max": 0.6224593312018546
+      },
+      "candidate_scores": {
+        "count": 2,
+        "unique_values": 1,
+        "min": 0.8224593312018545,
+        "mean": 0.8224593312018545,
+        "max": 0.8224593312018545
+      },
+      "candidate_pair_count": 1,
+      "equal_score_pairs": 1,
+      "near_score_pairs_including_equal": 1,
+      "near_pair_fraction": 1.0,
+      "top_rank_ties": 2,
+      "hash_decides_winner": true,
+      "selected_passage_id": "demo-garden"
+    },
+    "high_speed": {
+      "initial_probabilities": {
+        "count": 6,
+        "unique_values": 1,
+        "min": 0.7502601055951177,
+        "mean": 0.7502601055951178,
+        "max": 0.7502601055951177
+      },
+      "candidate_scores": {
+        "count": 2,
+        "unique_values": 1,
+        "min": 0.9502601055951176,
+        "mean": 0.9502601055951176,
+        "max": 0.9502601055951176
+      },
+      "candidate_pair_count": 1,
+      "equal_score_pairs": 1,
+      "near_score_pairs_including_equal": 1,
+      "near_pair_fraction": 1.0,
+      "top_rank_ties": 2,
+      "hash_decides_winner": true,
+      "selected_passage_id": "demo-garden"
+    },
+    "autonomous": {
+      "initial_probabilities": {
+        "count": 6,
+        "unique_values": 1,
+        "min": 0.8581489350995123,
+        "mean": 0.8581489350995123,
+        "max": 0.8581489350995123
+      },
+      "candidate_scores": {
+        "count": 2,
+        "unique_values": 1,
+        "min": 0.9418510649004878,
+        "mean": 0.9418510649004878,
+        "max": 0.9418510649004878
+      },
+      "candidate_pair_count": 1,
+      "equal_score_pairs": 1,
+      "near_score_pairs_including_equal": 1,
+      "near_pair_fraction": 1.0,
+      "top_rank_ties": 2,
+      "hash_decides_winner": true,
+      "selected_passage_id": "demo-library"
+    }
+  },
+  "limitations": [
+    "Initial, unexposed users only; no answer events or learned skill differences.",
+    "Item stars and uniform hint 2 are hypothetical sensitivity checks, not calibrated difficulty labels.",
+    "The supplied file label records input provenance, not independent verification of how it was generated.",
+    "Pair frequencies describe this catalog only; near scores do not activate the exact hash tie breaker.",
+    "No observed accuracy, calibration, learning benefit or production data quality can be inferred."
+  ]
+}
