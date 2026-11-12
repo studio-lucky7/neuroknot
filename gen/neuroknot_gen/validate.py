@@ -22,6 +22,11 @@ def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _answer_is_longest(q: Question) -> bool:
+    lengths = [len(_norm(o)) for o in q.options]
+    return lengths[q.answer_index] == max(lengths)
+
+
 def check_question(q: Question, passage: Passage, index: int) -> list[str]:
     where = f"문항 {index + 1}"
     problems: list[str] = []
@@ -49,6 +54,15 @@ def check_question(q: Question, passage: Passage, index: int) -> list[str]:
         problems.append(
             f"{where}: 오답 설명이 가리키는 선택지가 잘못됐습니다. "
             f"기대 {sorted(expected)}, 실제 {sorted(actual)}"
+        )
+
+    # 세 오답이 같은 오류만 노리면 오답 유형 라벨이 학습자에 대해 알려 주는 게 없다.
+    # (v2 기준 실행에서 30문항 중 22문항이 겹쳤다)
+    error_types = [d.error_type for d in q.distractors]
+    if len(set(error_types)) != len(error_types):
+        problems.append(
+            f"{where}: 오답 3개의 오류 유형이 겹칩니다 → {[e.value for e in error_types]}. "
+            "서로 다른 유형을 노리게 하세요."
         )
 
     if len(_norm(q.explanation)) < MIN_EXPLANATION:
@@ -81,6 +95,11 @@ def check_quiz(quiz: QuizSet, passage: Passage) -> list[str]:
     evidences = [_norm(q.evidence) for q in quiz.questions]
     if len(set(evidences)) != len(evidences):
         problems.append("여러 문항이 같은 근거 문장을 씁니다. 서로 다른 대목에서 출제하세요.")
+
+    # 모든 문항에서 정답이 가장 긴 선택지면 '제일 긴 것 고르기'만으로 다 맞힌다.
+    # 문항 하나에서 그런 건 우연(약 25%)일 수 있어 지문 전체로만 본다.
+    if all(_answer_is_longest(q) for q in quiz.questions):
+        problems.append("모든 문항에서 정답이 가장 긴 선택지입니다. 오답 중 하나 이상을 정답보다 길게 쓰세요.")
 
     for i, q in enumerate(quiz.questions):
         problems.extend(check_question(q, passage, i))

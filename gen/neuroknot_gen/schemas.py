@@ -46,9 +46,30 @@ class Question(BaseModel):
     )
 
 
+class DifficultyFactors(BaseModel):
+    """지문 난이도를 네 가지 요소로 나눠 0~2점씩 매긴 값 (quiz_v3부터).
+
+    모델에게 1~5를 한 번에 고르게 하면 거의 모든 지문에 2를 줬다. 요소별로 따로
+    판단하게 한 뒤 합계로 난이도를 정하면, 판단 근거를 사람이 확인할 수도 있다.
+    """
+
+    terms: int = Field(ge=0, le=2, description="전문 용어: 0 거의 없음, 1 있지만 지문에서 풀어 줌, 2 설명 없이 쓰임")
+    density: int = Field(ge=0, le=2, description="정보량: 0 수치·기관·조건이 적음, 1 보통, 2 여러 수치·조건을 서로 견줘야 함")
+    structure: int = Field(ge=0, le=2, description="문장 구조: 0 한 문장에 정보 하나, 1 보통, 2 한 문장에 조건·예외·인용이 겹침")
+    abstraction: int = Field(ge=0, le=2, description="추상도: 0 구체적 사건·행사 소개, 1 제도·절차 설명, 2 원리·인과·논증")
+
+    def to_hint(self) -> int:
+        """합계 0~8을 1~5로 옮긴다. 0~1→1, 2~3→2, 4~5→3, 6~7→4, 8→5."""
+        return 1 + (self.terms + self.density + self.structure + self.abstraction) // 2
+
+
 class QuizSet(BaseModel):
     """지문 한 편에서 만든 문항 묶음."""
 
+    # difficulty_hint 앞에 둔다. 모델은 스키마 순서대로 쓰므로, 요소를 먼저 따져 본 뒤 난이도를 쓴다.
+    difficulty_factors: DifficultyFactors | None = Field(
+        default=None, description="지문 난이도 요소별 점수. 있으면 difficulty_hint는 이 합계로 정해진다"
+    )
     difficulty_hint: int = Field(
         ge=1, le=5, description="지문 자체의 체감 난이도 (1 쉬움 ~ 5 어려움)"
     )

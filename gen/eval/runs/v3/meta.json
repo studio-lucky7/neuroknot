@@ -1,0 +1,21 @@
+{
+  "run": "v3",
+  "prompt_version": "quiz_v3",
+  "model": "gemini-3.8-flash",
+  "started_at": "2026-11-10T15:31:55+00:00",
+  "first_try_pass": [
+    "fx-001",
+    "fx-002",
+    "fx-003",
+    "fx-004",
+    "fx-005",
+    "fx-006",
+    "fx-009"
+  ],
+  "retried": [
+    "fx-007",
+    "fx-008",
+    "fx-010"
+  ],
+  "failed": {}
+}
