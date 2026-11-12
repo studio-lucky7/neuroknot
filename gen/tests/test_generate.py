@@ -89,3 +89,33 @@ def test_요소_점수가_없으면_모델_난이도를_그대로_쓴다():
 
     assert generated.quiz.difficulty_hint == 2
     assert "<출제할 능력>" not in client.calls[0]["contents"]
+
+
+def test_생성할_때마다_새_quiz_id와_생성_시각을_붙인다():
+    passage = load_passage("fx-001")
+    client = FakeClient(make_quiz(passage))
+
+    first = generate.generate_quiz(passage, prompt_version="quiz_v3", client=client)
+    second = generate.generate_quiz(passage, prompt_version="quiz_v3", client=client)
+
+    assert len(first.quiz_id) == 32 and int(first.quiz_id, 16) >= 0
+    assert first.quiz_id != second.quiz_id  # 같은 지문을 다시 만들면 다른 결과다
+    assert first.generated_at.tzinfo is not None
+
+
+def test_quiz_id가_생기기_전에_만든_파일도_읽는다():
+    from neuroknot_gen.schemas import GeneratedQuiz
+
+    path = Path(__file__).resolve().parent.parent / "eval/runs/v3/quiz/fx-001.json"
+    old = GeneratedQuiz.model_validate_json(path.read_text(encoding="utf-8"))
+    assert old.quiz_id is None and old.generated_at is None
+
+
+def test_quiz_id는_저장했다_읽어도_그대로다():
+    from neuroknot_gen.schemas import GeneratedQuiz
+
+    passage = load_passage("fx-001")
+    generated = generate.generate_quiz(passage, prompt_version="quiz_v3", client=FakeClient(make_quiz(passage)))
+    restored = GeneratedQuiz.model_validate_json(generated.model_dump_json())
+    assert restored.quiz_id == generated.quiz_id
+    assert restored.generated_at == generated.generated_at

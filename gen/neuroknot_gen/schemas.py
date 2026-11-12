@@ -4,6 +4,8 @@
 컬럼이 된다. 앱으로 내려보낼 때는 `answer_index`를 반드시 제외한다.
 """
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 from .skills import ErrorType, Skill
@@ -83,9 +85,17 @@ class GeneratedQuiz(BaseModel):
 
     프롬프트를 고친 뒤 '어떤 문항이 옛 버전으로 만들어졌는지' 추적하려면
     prompt_version 이 반드시 필요하다.
+
+    quiz_id는 생성 한 번마다 새로 붙는 ID다. 같은 지문을 다시 생성하면 내용이 달라지므로
+    지문 ID만으로는 어느 결과인지 가릴 수 없다. 사용자에게 내보낼 문항 세트를 확정할 때
+    Prediction이 이 값을 받아 확정 버전과 최종 문항 ID를 정한다. (PR #11 논의)
     """
 
     passage_id: str
+    # quiz_id 이전에 만든 파일(eval/runs/v2-base, v3 등)에는 없어서 None으로 읽힌다.
+    # 새로 생성하는 결과에는 generate_quiz가 항상 채운다.
+    quiz_id: str | None = Field(default=None, description="생성 한 번마다 새로 붙는 ID (32자리 16진수)")
+    generated_at: datetime | None = Field(default=None, description="생성 시각 (UTC)")
     prompt_version: str
     model: str
     quiz: QuizSet

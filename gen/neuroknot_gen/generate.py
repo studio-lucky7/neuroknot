@@ -15,6 +15,8 @@
 
 import hashlib
 import os
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from google import genai
@@ -174,6 +176,9 @@ def generate_quiz(
 
     return GeneratedQuiz(
         passage_id=passage.id,
+        # 재시도도 새 생성이므로 호출할 때마다 새 ID를 붙인다
+        quiz_id=uuid.uuid4().hex,
+        generated_at=datetime.now(timezone.utc),
         prompt_version=prompt_version,
         model=model,
         quiz=quiz,
