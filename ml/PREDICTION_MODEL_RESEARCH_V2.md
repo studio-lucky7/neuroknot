@@ -342,7 +342,7 @@ python scripts/diagnose_difficulty.py
 - `*_summary.csv`: 모든 지표의 평균·표본분산·SD·95% CI. `*_paired.csv`: 같은 시드 V1 대비 차이와 CI. 시드가 유일한 통계 반복 단위다.
 - `*_users.csv`: 사용자별 정답률, 커버리지, 목표 거리, 공통 예측 성능, θ RMSE.
 - `*_theta.csv`: 사용자·스킬·시점별 추정/실제 θ와 오차. `*_items.csv`: 문항별 추정/실제 b, split/노출 여부.
-- `*_manifest.json`: 정확한 설정, 시드, Python/라이브러리 버전, 실행 시 연구 코드 SHA-256. 튜닝 이후 추가된 replay/report 파일은 튜닝 manifest의 소스 목록에 없으며 튜닝 수치에는 관여하지 않는다.
+- `*_manifest.json`: 정확한 설정, 시드, Python/라이브러리 버전, 실행 시 연구 코드 SHA-256(검증 시 Git checkout의 줄바꿈 변환만 허용). 튜닝 이후 추가된 replay/report 파일은 튜닝 manifest의 소스 목록에 없으며 튜닝 수치에는 관여하지 않는다.
 - seed/설정/응답 생성 규칙으로 원시 온라인 로그를 다시 생성할 수 있다. `run(..., return_logs=True)`의 다섯 번째/여섯 번째 반환값이 관측/공통 로그다. 기존 `ml/results/`와 기존 기준 문서는 덮어쓰지 않았다(분리된 worktree의 기존 스크립트 기본 출력만 생성).
 
 ## 11. 검증과 변경 경계
