@@ -1,0 +1,21 @@
+{
+  "tune_seeds": [
+    11,
+    29,
+    47
+  ],
+  "validation_seeds": [
+    101,
+    211,
+    307,
+    401,
+    503
+  ],
+  "rule": "Two lowest common_48_probability_mse and lowest coverage_gap among non-ablation one-factor variants",
+  "candidates": [
+    "user_k_decay_0.2",
+    "coverage_0075",
+    "coverage_030"
+  ],
+  "tune_csv_sha256": "97f6218fb61a02a5c0a7861819a538103f3a2bd4c7e79d2c3e2920d9b92e2bb9"
+}
