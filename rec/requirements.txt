@@ -2,3 +2,5 @@ pydantic>=2,<3            # 지문 데이터 형식
 requests>=2.32,<3         # 지문 수집 (HTTP 요청)
 beautifulsoup4>=4.12,<5   # 받아온 HTML 에서 본문 뽑기
 pytest>=8.0               # 테스트
+google-genai              # 카테고리 분류 
+python-dotenv             # .env 에서 키 읽기
